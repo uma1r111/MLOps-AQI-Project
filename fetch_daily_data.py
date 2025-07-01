@@ -99,7 +99,9 @@ else:
     combined_df = merged_df
 
 # Sort and save
+combined_df["datetime"] = pd.to_datetime(combined_df["datetime"], errors="coerce")
+combined_df = combined_df.dropna(subset=["datetime"])
 combined_df.sort_values("datetime", inplace=True)
 combined_df.to_csv(csv_file, index=False)
 
-print(f"✅ Appended data for {start_date} to {csv_file}")
+print(f"Appended data for {start_date} to {csv_file}")
