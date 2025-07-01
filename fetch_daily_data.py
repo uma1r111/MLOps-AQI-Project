@@ -74,7 +74,8 @@ print(f"Fetched {len(merged_df)} hourly records for {start_date}")
 if os.path.exists(csv_file):
     print("Loading existing CSV...")
     try:
-        existing_df = pd.read_csv(csv_file, parse_dates=["datetime"])
+        existing_df = pd.read_csv(csv_file)
+        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], dayfirst=True)
     except Exception as e:
         print("Error reading existing file. Aborting to prevent overwrite.")
         raise e
