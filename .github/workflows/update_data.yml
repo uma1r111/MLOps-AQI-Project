@@ -1,0 +1,34 @@
+name: Daily AQI & Weather Data Fetch
+
+on:
+  schedule:
+    - cron: "0 2 * * *"  # Runs daily at 2 AM UTC
+  workflow_dispatch:     # Allows manual triggering
+
+jobs:
+  fetch-and-append-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run daily fetch script
+        run: python fetch_daily_data.py
+
+      - name: Commit and push updated CSV
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add karachi_weather_apr1_to_current.csv
+          git commit -m "Daily update: AQI + Weather data" || echo "No changes to commit"
+          git push
