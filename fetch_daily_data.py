@@ -75,7 +75,7 @@ if os.path.exists(csv_file):
     print("Loading existing CSV...")
     try:
         existing_df = pd.read_csv(csv_file)
-        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], dayfirst=True)
+        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], format="ISO8601", errors="coerce")
     except Exception as e:
         print("Error reading existing file. Aborting to prevent overwrite.")
         raise e
