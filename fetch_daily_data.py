@@ -100,8 +100,10 @@ if os.path.exists(csv_file):
     print("Loading existing CSV...")
     try:
         existing_df = pd.read_csv(csv_file)
-        # Parse datetime with explicit timezone handling
-        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], utc=True, errors="coerce").dt.tz_convert("Asia/Karachi")
+        # Parse datetime in DD/MM/YYYY HH:MM:SS AM/PM format
+        existing_df["datetime"] = pd.to_datetime(
+            existing_df["datetime"], format="%d/%m/%Y %I:%M:%S %p", errors="coerce"
+        ).dt.tz_localize("Asia/Karachi")
     except Exception as e:
         print("Error reading existing file. Aborting to prevent overwrite.")
         raise e
@@ -118,9 +120,7 @@ if os.path.exists(csv_file):
 
     # Concatenate and handle duplicates
     combined_df = pd.concat([existing_df, merged_df], ignore_index=True)
-    # Sort by datetime to ensure consistent deduplication
     combined_df.sort_values("datetime", inplace=True)
-    # Keep the latest row for duplicate datetimes
     combined_df.drop_duplicates(subset="datetime", keep="last", inplace=True)
 
     # Check if anything changed
@@ -132,7 +132,6 @@ if os.path.exists(csv_file):
     # Safety check
     if len(combined_df) < len(existing_df):
         print(f"Warning: Merge resulted in {len(existing_df) - len(combined_df)} fewer rows. Investigating...")
-        # Log duplicate datetimes for debugging
         duplicates = combined_df[combined_df["datetime"].duplicated(keep=False)]
         if not duplicates.empty:
             print(f"Found {len(duplicates)} duplicate datetime entries. Check data sources for overlaps.")
@@ -147,6 +146,8 @@ else:
 # ------------------------
 
 combined_df.sort_values("datetime", inplace=True)
+# Format datetime to DD/MM/YYYY HH:MM:SS AM/PM
+combined_df["datetime"] = combined_df["datetime"].dt.strftime("%d/%m/%Y %I:%M:%S %p")
 # Ensure consistent column order
 column_order = ["datetime", "temp_C", "humidity_%", "windspeed_kph", "precip_mm", "pm10", "pm2_5", "co", "no2", "so2", "o3", "aqi_us"]
 combined_df = combined_df[column_order]
