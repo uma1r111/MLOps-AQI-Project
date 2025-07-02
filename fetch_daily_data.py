@@ -33,18 +33,24 @@ pollutant_url = (
 print("Fetching pollutant data...")
 pollutant_resp = requests.get(pollutant_url)
 pollutant_resp.raise_for_status()
-pollutant_raw = pollutant_resp.json()["hourly"]
+pollutant_data = pollutant_resp.json()["hourly"]
+pollutant_df = pd.DataFrame(pollutant_data)
+pollutant_df["datetime"] = pd.to_datetime(pollutant_data["time"])
+pollutant_df.drop(columns=["time"], inplace=True)
 
-pollutant_df = pd.DataFrame({
-    "datetime": pd.to_datetime(pollutant_raw["time"]),
-    "pm10": pollutant_raw["pm10"],
-    "pm2_5": pollutant_raw["pm2_5"],
-    "co": pollutant_raw["carbon_monoxide"],
-    "no2": pollutant_raw["nitrogen_dioxide"],
-    "so2": pollutant_raw["sulphur_dioxide"],
-    "o3": pollutant_raw["ozone"],
-    "aqi_us": pollutant_raw["us_aqi"]
-})
+# Rename pollutant columns to match CSV
+pollutant_df.rename(
+    columns={
+        "pm10": "pm10",
+        "pm2_5": "pm2_5",
+        "carbon_monoxide": "co",
+        "nitrogen_dioxide": "no2",
+        "sulphur_dioxide": "so2",
+        "ozone": "o3",
+        "us_aqi": "aqi_us",
+    },
+    inplace=True,
+)
 
 # ------------------------
 # Fetch weather data
@@ -61,21 +67,29 @@ weather_url = (
 print("Fetching weather data...")
 weather_resp = requests.get(weather_url)
 weather_resp.raise_for_status()
-weather_raw = weather_resp.json()["hourly"]
+weather_data = weather_resp.json()["hourly"]
+weather_df = pd.DataFrame(weather_data)
+weather_df["datetime"] = pd.to_datetime(weather_data["time"])
+weather_df.drop(columns=["time"], inplace=True)
 
-weather_df = pd.DataFrame({
-    "datetime": pd.to_datetime(weather_raw["time"]),
-    "temp_C": weather_raw["temperature_2m"],
-    "humidity_%": weather_raw["relative_humidity_2m"],
-    "windspeed_kph": weather_raw["wind_speed_10m"],
-    "precip_mm": weather_raw["precipitation"]
-})
+# Rename weather columns to match CSV
+weather_df.rename(
+    columns={
+        "temperature_2m": "temp_C",
+        "relative_humidity_2m": "humidity_%",
+        "wind_speed_10m": "windspeed_kph",
+        "precipitation": "precip_mm",
+    },
+    inplace=True,
+)
 
 # ------------------------
 # Merge data
 # ------------------------
 
 merged_df = pd.merge(pollutant_df, weather_df, on="datetime", how="inner")
+merged_df["datetime"] = pd.to_datetime(merged_df["datetime"])
+
 print(f"Fetched {len(merged_df)} hourly records for {start_date}")
 
 # ------------------------
@@ -86,10 +100,12 @@ if os.path.exists(csv_file):
     print("Loading existing CSV...")
     try:
         existing_df = pd.read_csv(csv_file)
-        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], errors="coerce", dayfirst=True)
+        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], format="ISO8601", errors="coerce")
     except Exception as e:
         print("Error reading existing file. Aborting to prevent overwrite.")
         raise e
+
+    existing_df["datetime"] = pd.to_datetime(existing_df["datetime"])
 
     # Backup original
     backup_file = csv_file.replace(".csv", "_backup.csv")
@@ -99,13 +115,16 @@ if os.path.exists(csv_file):
     combined_df = pd.concat([existing_df, merged_df], ignore_index=True)
     combined_df.drop_duplicates(subset="datetime", inplace=True)
 
+    # Check if anything changed
     if len(combined_df) == len(existing_df):
         print("No new data added. CSV unchanged.")
     else:
         print(f"CSV updated: {len(combined_df) - len(existing_df)} new rows added.")
 
+    # Safety check
     if len(combined_df) < len(existing_df):
-        raise ValueError("Merge resulted in fewer rows — aborting write to prevent data loss.")
+        raise ValueError("Merge resulted in fewer rows than before — aborting write to prevent data loss.")
+
 else:
     print("No existing CSV found. Creating new file.")
     combined_df = merged_df
