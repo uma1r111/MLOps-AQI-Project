@@ -43,7 +43,7 @@ pollutant_df = pd.DataFrame({
     "no2": pollutant_raw["nitrogen_dioxide"],
     "so2": pollutant_raw["sulphur_dioxide"],
     "o3": pollutant_raw["ozone"],
-    "aqi_us": pollutant_raw["us_aqi"],
+    "aqi_us": pollutant_raw["us_aqi"]
 })
 
 # ------------------------
@@ -68,7 +68,7 @@ weather_df = pd.DataFrame({
     "temp_C": weather_raw["temperature_2m"],
     "humidity_%": weather_raw["relative_humidity_2m"],
     "windspeed_kph": weather_raw["wind_speed_10m"],
-    "precip_mm": weather_raw["precipitation"],
+    "precip_mm": weather_raw["precipitation"]
 })
 
 # ------------------------
@@ -76,8 +76,6 @@ weather_df = pd.DataFrame({
 # ------------------------
 
 merged_df = pd.merge(pollutant_df, weather_df, on="datetime", how="inner")
-merged_df["datetime"] = pd.to_datetime(merged_df["datetime"])
-
 print(f"Fetched {len(merged_df)} hourly records for {start_date}")
 
 # ------------------------
@@ -88,12 +86,10 @@ if os.path.exists(csv_file):
     print("Loading existing CSV...")
     try:
         existing_df = pd.read_csv(csv_file)
-        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], format="ISO8601", errors="coerce")
+        existing_df["datetime"] = pd.to_datetime(existing_df["datetime"], errors="coerce", dayfirst=True)
     except Exception as e:
         print("Error reading existing file. Aborting to prevent overwrite.")
         raise e
-
-    existing_df["datetime"] = pd.to_datetime(existing_df["datetime"])
 
     # Backup original
     backup_file = csv_file.replace(".csv", "_backup.csv")
@@ -103,16 +99,13 @@ if os.path.exists(csv_file):
     combined_df = pd.concat([existing_df, merged_df], ignore_index=True)
     combined_df.drop_duplicates(subset="datetime", inplace=True)
 
-    # Check if anything changed
     if len(combined_df) == len(existing_df):
         print("No new data added. CSV unchanged.")
     else:
         print(f"CSV updated: {len(combined_df) - len(existing_df)} new rows added.")
 
-    # Safety check
     if len(combined_df) < len(existing_df):
-        raise ValueError("Merge resulted in fewer rows than before — aborting write to prevent data loss.")
-
+        raise ValueError("Merge resulted in fewer rows — aborting write to prevent data loss.")
 else:
     print("No existing CSV found. Creating new file.")
     combined_df = merged_df
