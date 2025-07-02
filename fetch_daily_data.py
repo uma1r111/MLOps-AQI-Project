@@ -26,17 +26,25 @@ pollutant_url = (
     "https://air-quality-api.open-meteo.com/v1/air-quality"
     f"?latitude={latitude}&longitude={longitude}"
     f"&start_date={start_date}&end_date={end_date}"
-    f"&hourly=pm10,pm2_5,co,no2,s02,o3,us_aqi"
+    f"&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi"
     f"&timezone={timezone}"
 )
 
 print("Fetching pollutant data...")
 pollutant_resp = requests.get(pollutant_url)
 pollutant_resp.raise_for_status()
-pollutant_data = pollutant_resp.json()["hourly"]
-pollutant_df = pd.DataFrame(pollutant_data)
-pollutant_df["datetime"] = pd.to_datetime(pollutant_df["time"])
-pollutant_df.drop(columns=["time"], inplace=True)
+pollutant_raw = pollutant_resp.json()["hourly"]
+
+pollutant_df = pd.DataFrame({
+    "datetime": pd.to_datetime(pollutant_raw["time"]),
+    "pm10": pollutant_raw["pm10"],
+    "pm2_5": pollutant_raw["pm2_5"],
+    "co": pollutant_raw["carbon_monoxide"],
+    "no2": pollutant_raw["nitrogen_dioxide"],
+    "so2": pollutant_raw["sulphur_dioxide"],
+    "o3": pollutant_raw["ozone"],
+    "aqi_us": pollutant_raw["us_aqi"],
+})
 
 # ------------------------
 # Fetch weather data
@@ -46,17 +54,22 @@ weather_url = (
     "https://api.open-meteo.com/v1/forecast?"
     f"latitude={latitude}&longitude={longitude}"
     f"&start_date={start_date}&end_date={end_date}"
-    "&hourly=temp_C,humidity_%,windspeed_kph,precip_mm"
+    "&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
     f"&timezone={timezone}"
 )
 
 print("Fetching weather data...")
 weather_resp = requests.get(weather_url)
 weather_resp.raise_for_status()
-weather_data = weather_resp.json()["hourly"]
-weather_df = pd.DataFrame(weather_data)
-weather_df["datetime"] = pd.to_datetime(weather_df["time"])
-weather_df.drop(columns=["time"], inplace=True)
+weather_raw = weather_resp.json()["hourly"]
+
+weather_df = pd.DataFrame({
+    "datetime": pd.to_datetime(weather_raw["time"]),
+    "temp_C": weather_raw["temperature_2m"],
+    "humidity_%": weather_raw["relative_humidity_2m"],
+    "windspeed_kph": weather_raw["wind_speed_10m"],
+    "precip_mm": weather_raw["precipitation"],
+})
 
 # ------------------------
 # Merge data
