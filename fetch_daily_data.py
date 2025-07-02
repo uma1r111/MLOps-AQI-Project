@@ -26,7 +26,7 @@ pollutant_url = (
     "https://air-quality-api.open-meteo.com/v1/air-quality"
     f"?latitude={latitude}&longitude={longitude}"
     f"&start_date={start_date}&end_date={end_date}"
-    f"&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi"
+    f"&hourly=pm10,pm2_5,co,no2,s02,o3,us_aqi"
     f"&timezone={timezone}"
 )
 
@@ -46,7 +46,7 @@ weather_url = (
     "https://api.open-meteo.com/v1/forecast?"
     f"latitude={latitude}&longitude={longitude}"
     f"&start_date={start_date}&end_date={end_date}"
-    "&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
+    "&hourly=temp_C,humidity_%,windspeed_kph,precip_mm"
     f"&timezone={timezone}"
 )
 
