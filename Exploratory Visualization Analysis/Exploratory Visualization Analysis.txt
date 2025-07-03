@@ -1,0 +1,17 @@
+Exploratory Visualisation Analysis:
+
+1) Strong Positive Correlations with AQI (aqi_us):
+
+- scaled_log_pm2_5 (0.66) and scaled_log_pm10 (0.64) show the strongest positive correlations
+with aqi_us. This indicates that PM2.5 and PM10 (particulate matter) are major drivers 
+of air quality degradation in Karachi, consistent with AQI calculations where PM 
+is often a key factor.
+
+- scaled_log_co (0.17) and scaled_log_no2 (0.12) also have weak positive correlations, 
+suggesting carbon monoxide and nitrogen dioxide contribute to higher AQI values, 
+likely from traffic or industrial sources.
+
+- scaled_o3 (0.10) has a minor positive correlation, indicating ozone plays a smaller
+role in the observed AQI.
+
+2) 
