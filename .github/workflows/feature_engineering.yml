@@ -32,7 +32,7 @@ jobs:
           python "Data Preprocessing/feature_engineering.py"
 
       - name: ☁️ Upload Preprocessed CSV as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: preprocessed-aqi-data
           path: full_preprocessed_aqi_weather_data_with_all_features.csv
