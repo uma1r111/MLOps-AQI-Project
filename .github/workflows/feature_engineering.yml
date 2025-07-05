@@ -29,7 +29,7 @@ jobs:
 
       - name: ⚙️ Run Feature Engineering
         run: |
-          python "Data Preprocessing/feature_engineering.py"
+          python "Data Preprocessing/run_preprocessing.py"
 
       - name: ☁️ Upload Preprocessed CSV as Artifact
         uses: actions/upload-artifact@v4
