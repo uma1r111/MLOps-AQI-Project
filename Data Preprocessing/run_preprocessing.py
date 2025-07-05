@@ -76,6 +76,6 @@ final_df.sort_values("datetime", inplace=True)
 final_df['datetime'] = final_df['datetime'].dt.strftime('%d/%m/%Y %H:%M')  # Explicitly format before saving
 final_df.drop(columns=['index'], errors='ignore', inplace=True)  # Drop the extra index column if it exists
 
-final_path = "full_preprocessed_aqi_weather_data_with_all_features1.csv"
+final_path = "full_preprocessed_aqi_weather_data_with_all_features.csv"
 final_df.to_csv(final_path, index=False)
 print(f"✅ Saved: {final_path} with shape {final_df.shape}")
