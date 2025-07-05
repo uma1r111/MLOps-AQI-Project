@@ -1,8 +1,6 @@
 # data_quality_check.py
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Load raw CSV
 df = pd.read_csv("karachi_weather_apr1_to_current.csv")
