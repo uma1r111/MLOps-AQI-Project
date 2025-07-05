@@ -1,0 +1,46 @@
+name: Feature Engineering
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"  # Runs daily at 8 AM PKT
+
+jobs:
+  feature-engineering:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🧪 Run Data Quality Check
+        run: |
+          python "Data Preprocessing/data_quality_check.py"
+
+      - name: ⚙️ Run Feature Engineering
+        run: |
+          python "Data Preprocessing/feature_engineering.py"
+
+      - name: ☁️ Upload Preprocessed CSV as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: preprocessed-aqi-data
+          path: full_preprocessed_aqi_weather_data_with_all_features.csv
+
+      - name: 📤 Commit and Push Preprocessed CSV
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add full_preprocessed_aqi_weather_data_with_all_features.csv
+          git commit -m "Daily update: Feature engineered AQI + weather data" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
