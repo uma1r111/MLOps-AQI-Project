@@ -25,7 +25,7 @@ jobs:
 
       - name: Run feature selection script
         run: |
-          Feature Selection/python feature_selection.py  
+          python "Feature Selection/feature_selection.py"
 
       - name: Initialize DVC (if not already initialized)
         run: dvc init --no-scm || echo "DVC already initialized"
