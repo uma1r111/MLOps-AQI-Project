@@ -23,30 +23,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas "dvc[s3]"
 
-      - name: Run feature selection script
-        run: 
-          python "Feature Selection/feature_selection.py"
-
       - name: Initialize DVC (if not already initialized)
         run: dvc init --no-scm || echo "DVC already initialized"
 
+      - name: Checkout feature_selection.csv from DVC
+        run: dvc checkout feature_selection.csv || { echo "DVC checkout failed"; exit 1; }
+
+      - name: Run feature selection script
+        run: python "Feature Selection/feature_selection.py"  # Adjusted path
+
       - name: Track feature_selection.csv with DVC
         run: |
-          # Check if feature_selection.csv is tracked by Git
+          # Ensure feature_selection.csv is not tracked by Git
           if git ls-files --error-unmatch feature_selection.csv >/dev/null 2>&1; then
             git rm -r --cached feature_selection.csv
-            git commit -m "Stop tracking feature_selection.csv" || echo "No changes to commit"
+            git commit -m "Stop tracking feature_selection.csv [skip ci]" || echo "No changes to commit"
           fi
-          # Proceed with DVC tracking
-          if [ ! -f "feature_selection.csv.dvc" ]; then
-            dvc add feature_selection.csv
-            git add feature_selection.csv.dvc
-            git commit -m "Track feature_selection.csv with DVC" || echo "No DVC changes to commit"
-          else
-            dvc add feature_selection.csv
-            git add feature_selection.csv.dvc
-            git commit -m "Update feature_selection.csv with DVC" || echo "No DVC changes to commit"
-          fi
+          # Update DVC tracking
+          dvc add feature_selection.csv
+          git add feature_selection.csv.dvc
+          git commit -m "Update feature_selection.csv with DVC [skip ci]" || echo "No DVC changes to commit"
 
       - name: Configure S3 remote
         env:
@@ -68,7 +64,7 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git add feature_selection.csv.dvc
-          git commit -m "Update feature_selection.csv with new data" || echo "No changes to commit"
+          git commit -m "Update feature_selection.csv with new data [skip ci]" || echo "No changes to commit"
           git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
