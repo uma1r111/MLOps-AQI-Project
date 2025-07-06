@@ -3,7 +3,7 @@ name: Feature Engineering
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"  # Runs daily at 8 AM PKT
+    - cron: "0 10 * * *"  # Runs daily at 3 PM PKT
 
 jobs:
   feature-engineering:
