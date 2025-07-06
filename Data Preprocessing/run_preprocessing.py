@@ -26,13 +26,13 @@ if new_df.empty:
     exit()
 
 # Log transformation (apply only to new data)
-skewed_cols = ["co", "pm2_5", "pm10", "precip_mm", "so2", "no2"]
+skewed_cols = ["co", "pm2_5", "pm10", "precip_mm", "so2", "no2", "windspeed_kph"]
 for col in skewed_cols:
     new_df[f"log_{col}"] = np.log1p(new_df[col].replace(0, np.nan)).fillna(0)  # Handle zeros
 
 # Scaling (apply only to new data, ensure alignment)
 scale_cols = [
-    "temp_C", "humidity_%", "windspeed_kph",
+    "temp_C", "humidity_%", "log_windspeed_kph",
     "log_pm2_5", "log_pm10", "log_precip_mm",
     "log_co", "log_no2", "log_so2", "o3"
 ]
@@ -65,11 +65,11 @@ new_df['hour_sin'] = np.sin(new_df['hour'] * 2 * np.pi / 24)
 new_df['hour_cos'] = np.cos(new_df['hour'] * 2 * np.pi / 24)
 
 # Interaction Features
-new_df['log_pm2_5_scaled_windspeed_kph'] = new_df['log_pm2_5'] * new_df['scaled_windspeed_kph']
+new_df['log_pm2_5_scaled_log_windspeed_kph'] = new_df['log_pm2_5'] * new_df['scaled_log_windspeed_kph']
 new_df['scaled_temp_C_scaled_o3'] = new_df['scaled_temp_C'] * new_df['scaled_o3']
-new_df['scaled_temp_C_scaled_windspeed_kph'] = new_df['scaled_temp_C'] * new_df['scaled_windspeed_kph']
-
+new_df['scaled_temp_C_scaled_log_windspeed_kph'] = new_df['scaled_temp_C'] * new_df['scaled_log_windspeed_kph']
 # Combine and save final dataset
+
 final_df = pd.concat([prev_df, new_df.reset_index()], ignore_index=True)
 final_df.drop_duplicates(subset="datetime", keep="last", inplace=True)
 final_df.sort_values("datetime", inplace=True)
