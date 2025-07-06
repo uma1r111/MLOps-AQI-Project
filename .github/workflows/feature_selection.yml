@@ -24,7 +24,8 @@ jobs:
           pip install pandas
 
       - name: Run feature selection script
-        run: python feature_selection.py
+        run: |
+          python "Feature Selection/feature_selection.py"
 
       - name: Commit and push changes
         run: |
