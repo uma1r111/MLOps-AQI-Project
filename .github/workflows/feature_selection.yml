@@ -24,7 +24,7 @@ jobs:
           pip install pandas "dvc[s3]"
 
       - name: Run feature selection script
-        run: |
+        run: 
           python "Feature Selection/feature_selection.py"
 
       - name: Initialize DVC (if not already initialized)
@@ -32,14 +32,20 @@ jobs:
 
       - name: Track feature_selection.csv with DVC
         run: |
+          # Check if feature_selection.csv is tracked by Git
+          if git ls-files --error-unmatch feature_selection.csv >/dev/null 2>&1; then
+            git rm -r --cached feature_selection.csv
+            git commit -m "Stop tracking feature_selection.csv" || echo "No changes to commit"
+          fi
+          # Proceed with DVC tracking
           if [ ! -f "feature_selection.csv.dvc" ]; then
             dvc add feature_selection.csv
             git add feature_selection.csv.dvc
-            git commit -m "Track feature_selection.csv with DVC [skip ci]" || echo "No DVC changes to commit"
+            git commit -m "Track feature_selection.csv with DVC" || echo "No DVC changes to commit"
           else
             dvc add feature_selection.csv
             git add feature_selection.csv.dvc
-            git commit -m "Update feature_selection.csv with DVC [skip ci]" || echo "No DVC changes to commit"
+            git commit -m "Update feature_selection.csv with DVC" || echo "No DVC changes to commit"
           fi
 
       - name: Configure S3 remote
@@ -47,12 +53,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          echo "Access Key ID: $AWS_ACCESS_KEY_ID"  # Debug
-          echo "Secret Access Key: $AWS_SECRET_ACCESS_KEY"  # Debug
+          echo "Access Key ID: $AWS_ACCESS_KEY_ID"
+          echo "Secret Access Key: $AWS_SECRET_ACCESS_KEY"
           dvc remote add -d myremote s3://your-bucket-name/path || echo "Remote already configured"
           dvc remote modify myremote endpointurl https://s3.amazonaws.com
-          dvc remote modify myremote access_key_id "$AWS_ACCESS_KEY_ID"
-          dvc remote modify myremote secret_access_key "$AWS_SECRET_ACCESS_KEY" || { echo "Failed to configure S3 remote"; exit 1; }
+          dvc remote modify myremote access_key_id "$AWS_ACCESS_KEY_ID" || echo "Failed to set access key"
+          dvc remote modify myremote secret_access_key "$AWS_SECRET_ACCESS_KEY" || echo "Failed to set secret key"
 
       - name: Push DVC cache to S3
         run: dvc push || { echo "DVC push failed"; exit 1; }
@@ -63,6 +69,6 @@ jobs:
           git config --global user.email "actions@github.com"
           git add feature_selection.csv.dvc
           git commit -m "Update feature_selection.csv with new data" || echo "No changes to commit"
-          git push origin main  # Use default push with GITHUB_TOKEN
+          git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
