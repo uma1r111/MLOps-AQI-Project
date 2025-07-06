@@ -11,8 +11,8 @@ full_df = pd.read_csv("full_preprocessed_aqi_weather_data_with_all_features.csv"
 feature_df = pd.read_csv("feature_selection.csv")
 
 # Ensure datetime is in datetime format with correct format
-full_df['datetime'] = pd.to_datetime(full_df['datetime'], format='%d/%m/%Y %H:%M')
-feature_df['datetime'] = pd.to_datetime(feature_df['datetime'], format='%d/%m/%Y %H:%M')
+full_df['datetime'] = pd.to_datetime(full_df['datetime'], format='%Y-%m-%d %H:%M:%S')
+feature_df['datetime'] = pd.to_datetime(feature_df['datetime'], format='%Y-%m-%d %H:%M:%S')
 
 # Identify new rows based on datetime
 last_datetime = feature_df['datetime'].max()
