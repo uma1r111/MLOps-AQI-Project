@@ -2,7 +2,7 @@ name: Feature Selection
 
 on:
   schedule:
-    - cron: "0 11 * * *" # Runs daily at 4 PM PKT
+    - cron: "0 11 * * *" # Runs daily at 4 PM PKT (UTC 11:00)
   workflow_dispatch: # Allows manual trigger
 
 jobs:
@@ -21,16 +21,48 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas
+          pip install pandas "dvc[s3]"
 
       - name: Run feature selection script
         run: |
-          python "Feature Selection/feature_selection.py"
+          Feature Selection/python feature_selection.py  
+
+      - name: Initialize DVC (if not already initialized)
+        run: dvc init --no-scm || echo "DVC already initialized"
+
+      - name: Track feature_selection.csv with DVC
+        run: |
+          if [ ! -f "feature_selection.csv.dvc" ]; then
+            dvc add feature_selection.csv
+            git add feature_selection.csv.dvc
+            git commit -m "Track feature_selection.csv with DVC [skip ci]" || echo "No DVC changes to commit"
+          else
+            dvc add feature_selection.csv
+            git add feature_selection.csv.dvc
+            git commit -m "Update feature_selection.csv with DVC [skip ci]" || echo "No DVC changes to commit"
+          fi
+
+      - name: Configure S3 remote
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Access Key ID: $AWS_ACCESS_KEY_ID"  # Debug
+          echo "Secret Access Key: $AWS_SECRET_ACCESS_KEY"  # Debug
+          dvc remote add -d myremote s3://your-bucket-name/path || echo "Remote already configured"
+          dvc remote modify myremote endpointurl https://s3.amazonaws.com
+          dvc remote modify myremote access_key_id "$AWS_ACCESS_KEY_ID"
+          dvc remote modify myremote secret_access_key "$AWS_SECRET_ACCESS_KEY" || { echo "Failed to configure S3 remote"; exit 1; }
+
+      - name: Push DVC cache to S3
+        run: dvc push || { echo "DVC push failed"; exit 1; }
 
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add feature_selection.csv
-          git commit -m "Daily Update: New data append to feature_selection.csv" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+          git add feature_selection.csv.dvc
+          git commit -m "Update feature_selection.csv with new data" || echo "No changes to commit"
+          git push origin main  # Use default push with GITHUB_TOKEN
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
