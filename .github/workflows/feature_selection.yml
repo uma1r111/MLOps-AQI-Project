@@ -29,6 +29,9 @@ jobs:
       - name: Checkout feature_selection.csv from DVC
         run: dvc checkout feature_selection.csv || { echo "DVC checkout failed"; exit 1; }
 
+      - name: Pull DVC cache from S3 (if needed)
+        run: dvc pull feature_selection.csv || { echo "DVC pull failed"; exit 1; }
+
       - name: Run feature selection script
         run: python "Feature Selection/feature_selection.py"  # Adjusted path
 
@@ -51,7 +54,8 @@ jobs:
         run: |
           echo "Access Key ID: $AWS_ACCESS_KEY_ID"
           echo "Secret Access Key: $AWS_SECRET_ACCESS_KEY"
-          dvc remote add -d myremote s3://your-bucket-name/path || echo "Remote already configured"
+          dvc remote list
+          dvc remote add -d myremote s3://s3-bucket-umairrr/path || echo "Remote already configured"
           dvc remote modify myremote endpointurl https://s3.amazonaws.com
           dvc remote modify myremote access_key_id "$AWS_ACCESS_KEY_ID" || echo "Failed to set access key"
           dvc remote modify myremote secret_access_key "$AWS_SECRET_ACCESS_KEY" || echo "Failed to set secret key"
