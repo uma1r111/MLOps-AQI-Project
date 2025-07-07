@@ -26,20 +26,21 @@ jobs:
       - name: Install DVC with S3 support
         run: pip install dvc[s3]
 
-      - name: Configure AWS credentials
+      - name: Pull latest feature_selection.csv from DVC remote
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
-        run: echo "AWS credentials configured"
-
-      - name: Pull latest feature_selection.csv from DVC remote
         run: dvc pull
 
       - name: Run feature selection script
         run: python "Feature Selection/feature_selection.py"
 
       - name: Track updated CSV with DVC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
         run: dvc add feature_selection.csv
 
       - name: Commit DVC changes and push to GitHub
