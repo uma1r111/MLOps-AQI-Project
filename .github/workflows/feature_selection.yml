@@ -33,12 +33,14 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
         run: echo "AWS credentials configured"
 
+      - name: Pull latest feature_selection.csv from DVC remote
+        run: dvc pull
+
       - name: Run feature selection script
         run: python "Feature Selection/feature_selection.py"
 
       - name: Track updated CSV with DVC
-        run: |
-          dvc add feature_selection.csv
+        run: dvc add feature_selection.csv
 
       - name: Commit DVC changes and push to GitHub
         run: |
