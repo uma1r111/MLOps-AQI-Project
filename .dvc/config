@@ -1,0 +1,6 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = s3://s3-bucket-umairrr
+    region = us-east-1
+    profile = default
