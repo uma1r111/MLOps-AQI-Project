@@ -31,7 +31,7 @@ jobs:
         run: dvc pull
 
       - name: Run AQI prediction script
-        run: python "Model Training/predict_next_3_days.py"
+        run: python "Model Training/predict_next_3days.py"
 
       - name: Track predictions.csv with DVC
         env:
