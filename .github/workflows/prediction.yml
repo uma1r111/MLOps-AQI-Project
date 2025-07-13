@@ -1,0 +1,56 @@
+name: AQI Prediction
+
+on:
+  schedule:
+    - cron: "0 12 */3 * *"  # Every 3 days at 5 PM PKT
+  workflow_dispatch:         # Allows manual run from GitHub
+
+jobs:
+  aqi-prediction:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn statsmodels dvc[s3]
+
+      - name: Pull feature_selection.csv from S3 (via DVC)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: dvc pull
+
+      - name: Run AQI prediction script
+        run: python "Model Training/predict_next_3_days.py"
+
+      - name: Track predictions.csv with DVC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: dvc add predictions.csv
+
+      - name: Commit predictions.csv.dvc to GitHub
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add predictions.csv.dvc .gitignore
+          git commit -m "Update predictions.csv via DVC [skip ci]" || echo "No changes to commit"
+          git push origin main
+
+      - name: ☁️ Push predictions data to S3 (via DVC)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: dvc push
