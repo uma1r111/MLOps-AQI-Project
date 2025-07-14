@@ -107,31 +107,6 @@ jobs:
           echo "Testing service..."
           curl -X POST http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}'
 
-      - name: Start BentoML Service
-        run: |
-          echo "Starting BentoML service with model: $MODEL_TAG"
-          # Start BentoML service in background
-          nohup bentoml serve $MODEL_TAG --port 3000 > bentoml_service.log 2>&1 &
-          
-          # Wait for service to start
-          echo "Waiting for BentoML service to start..."
-          for i in {1..30}; do
-            if curl -s http://localhost:3000/health >/dev/null 2>&1; then
-              echo "BentoML service is running"
-              break
-            fi
-            echo "Attempt $i: Service not ready yet, waiting..."
-            sleep 2
-          done
-          
-          # Check if service is actually running
-          if ! curl -s http://localhost:3000/health >/dev/null 2>&1; then
-            echo "BentoML service failed to start"
-            echo "Service logs:"
-            cat bentoml_service.log
-            exit 1
-          fi
-
       - name: Run BentoML prediction client
         run: python "Prediction Client/run_prediction_client.py"
 
