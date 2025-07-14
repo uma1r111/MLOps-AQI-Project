@@ -51,17 +51,15 @@ jobs:
           # Store the filename for next step
           echo "BENTOML_MODEL_FILE=$LATEST_MODEL" >> $GITHUB_ENV
 
-      - name: Import BentoML Model and Tag as Latest
+      - name: Import BentoML Model
         run: |
           echo "Importing BentoML model: $BENTOML_MODEL_FILE"
-          # Delete any existing 'latest' tag to avoid conflicts
-          bentoml models delete sarimax_model:latest || echo "No existing 'latest' tag found"
+          bentoml models import "$BENTOML_MODEL_FILE"
           
-          # Import the model with the 'latest' tag directly
-          bentoml models import "$BENTOML_MODEL_FILE" --tag sarimax_model:latest
-          
-          # Verify the tag was created
-          bentoml models list | grep "sarimax_model:latest"
+          # Get the imported model tag
+          MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
+          echo "Imported model tag: $MODEL_TAG"
+          echo "MODEL_TAG=$MODEL_TAG" >> $GITHUB_ENV
 
       - name: Copy Service File
         run: |
@@ -71,7 +69,7 @@ jobs:
 
       - name: Start BentoML Service
         run: |
-          echo "Starting BentoML service with model: sarimax_model:latest"
+          echo "Starting BentoML service with model: $MODEL_TAG"
           # Start BentoML service in background using your existing service.py
           nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
           
