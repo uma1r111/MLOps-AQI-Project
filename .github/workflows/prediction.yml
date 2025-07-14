@@ -2,7 +2,7 @@ name: AQI Prediction
 
 on:
   schedule:
-    - cron: "0 12 */3 * *"  # Every 3 days at 5 PM PKT
+    - cron: "0 12 * * *"  # Every day at 5 PM PKT
   workflow_dispatch:         # Allows manual run from GitHub
 
 jobs:
@@ -54,3 +54,21 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: dvc push
+
+      - name: 🔍 Get latest SARIMAX BentoML model tag
+        id: get_model_tag
+        run: |
+          MODEL_TAG=$(ls ~/.bentoml/models/sarimax_model | sort | tail -n 1)
+          echo "MODEL_TAG=$MODEL_TAG" >> $GITHUB_ENV
+
+      - name: 📦 Export SARIMAX model to .bentoml archive
+        run: |
+          bentoml models export "sarimax_model:$MODEL_TAG" "sarimax_model_$MODEL_TAG.bentoml"
+
+      - name: ☁️ Upload SARIMAX model to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          aws s3 cp "sarimax_model_$MODEL_TAG.bentoml" "s3://s3-bucket-umairrr/models/"
