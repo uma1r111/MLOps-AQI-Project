@@ -40,7 +40,7 @@ jobs:
           echo "Latest model: $LATEST_MODEL"
           
           if [ -z "$LATEST_MODEL" ]; then
-            echo " No SARIMAX model found in S3"
+            echo "No SARIMAX model found in S3"
             exit 1
           fi
           
@@ -54,18 +54,11 @@ jobs:
       - name: Import BentoML Model and Tag as Latest
         run: |
           echo "Importing BentoML model: $BENTOML_MODEL_FILE"
-          bentoml models import "$BENTOML_MODEL_FILE"
-          
-          # Get the imported model tag
-          MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
-          echo "Imported model tag: $MODEL_TAG"
-          
           # Delete any existing 'latest' tag to avoid conflicts
           bentoml models delete sarimax_model:latest || echo "No existing 'latest' tag found"
           
-          # Create a new tag 'latest' pointing to the imported model
-          bentoml models tag $MODEL_TAG sarimax_model:latest
-          echo "Tagged model as sarimax_model:latest"
+          # Import the model with the 'latest' tag directly
+          bentoml models import "$BENTOML_MODEL_FILE" --tag sarimax_model:latest
           
           # Verify the tag was created
           bentoml models list | grep "sarimax_model:latest"
