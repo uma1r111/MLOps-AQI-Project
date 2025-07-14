@@ -1,0 +1,42 @@
+name: BentoML AQI Forecast
+
+on:
+  schedule:
+    - cron: "0 13 * * *"  # Every day at 6 PM PKT
+  workflow_dispatch:       # Allow manual trigger from GitHub UI
+
+jobs:
+  bentoml-forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set Up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy bentoml==1.2.0 dvc[s3]
+
+      - name: 📡 Pull feature_selection.csv from S3 (via DVC)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: dvc pull feature_selection.csv.dvc
+
+      - name: 🔮 Run BentoML prediction client
+        run: python "Prediction Client/run_prediction_client.py"
+
+      - name: 💾 Commit updated bentoml_forecast_output.csv to GitHub
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add "Prediction Client/bentoml_forecast_output.csv"
+          git commit -m "🔄 Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
+          git push origin main
