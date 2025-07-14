@@ -112,6 +112,6 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add "Prediction Client/bentoml_forecast_output.csv"
+          git add bentoml_forecast_output.csv
           git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
           git push origin main
