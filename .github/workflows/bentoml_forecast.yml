@@ -1,5 +1,4 @@
 name: BentoML AQI Forecast
-
 on:
   schedule:
     - cron: "0 13 * * *"  # Every day at 6 PM PKT
@@ -8,35 +7,99 @@ on:
 jobs:
   bentoml-forecast:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Set Up Python 3.11
+      - name: Set Up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: 📦 Install Dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy bentoml==1.2.0 dvc[s3]
+          pip install pandas numpy bentoml==1.2.0 dvc[s3] scikit-learn statsmodels requests
 
-      - name: 📡 Pull feature_selection.csv from S3 (via DVC)
+      - name: Pull feature_selection.csv from S3 (via DVC)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: dvc pull feature_selection.csv.dvc
 
-      - name: 🔮 Run BentoML prediction client
+      - name: Get Latest BentoML Model from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          echo "Getting latest SARIMAX model from S3..."
+          # Get the latest model file
+          LATEST_MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
+          echo "Latest model: $LATEST_MODEL"
+          
+          if [ -z "$LATEST_MODEL" ]; then
+            echo " No SARIMAX model found in S3"
+            exit 1
+          fi
+          
+          # Download the model
+          echo "Downloading $LATEST_MODEL..."
+          aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" "./"
+          
+          # Store the filename for next step
+          echo "BENTOML_MODEL_FILE=$LATEST_MODEL" >> $GITHUB_ENV
+
+      - name: Import BentoML Model
+        run: |
+          echo "Importing BentoML model: $BENTOML_MODEL_FILE"
+          bentoml models import "$BENTOML_MODEL_FILE"
+          
+          # Get the imported model tag
+          MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
+          echo "Imported model tag: $MODEL_TAG"
+          echo "MODEL_TAG=$MODEL_TAG" >> $GITHUB_ENV
+
+      - name: Start BentoML Service
+        run: |
+          echo "Starting BentoML service with model: $MODEL_TAG"
+          # Start BentoML service in background
+          nohup bentoml serve $MODEL_TAG --port 3000 > bentoml_service.log 2>&1 &
+          
+          # Wait for service to start
+          echo "Waiting for BentoML service to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3000/health >/dev/null 2>&1; then
+              echo "BentoML service is running"
+              break
+            fi
+            echo "Attempt $i: Service not ready yet, waiting..."
+            sleep 2
+          done
+          
+          # Check if service is actually running
+          if ! curl -s http://localhost:3000/health >/dev/null 2>&1; then
+            echo "BentoML service failed to start"
+            echo "Service logs:"
+            cat bentoml_service.log
+            exit 1
+          fi
+
+      - name: Run BentoML prediction client
         run: python "Prediction Client/run_prediction_client.py"
 
-      - name: 💾 Commit updated bentoml_forecast_output.csv to GitHub
+      - name: Stop BentoML Service
+        if: always()
+        run: |
+          echo "Stopping BentoML service..."
+          pkill -f "bentoml serve" || true
+          echo "Service stopped"
+
+      - name: Commit updated bentoml_forecast_output.csv to GitHub
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git add "Prediction Client/bentoml_forecast_output.csv"
-          git commit -m "🔄 Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
+          git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
           git push origin main
