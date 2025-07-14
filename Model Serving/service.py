@@ -45,7 +45,7 @@ def forecast(input_data: Dict[str, Any]) -> Dict[str, Any]:
     Forecast AQI values using SARIMAX model
     
     Args:
-        input_data: Dictionary containing exogenous variables and steps
+        input_data: Dictionary containing exogenous variables, steps, and last_timestamp
         
     Returns:
         Dictionary with forecast values and dates
@@ -58,18 +58,24 @@ def forecast(input_data: Dict[str, Any]) -> Dict[str, Any]:
         # Ensure steps is provided, default to 72 if not
         steps = input_data.get("steps", 72)
         
+        # Get the last timestamp from input (expected format: "2025-07-13 23:00:00")
+        last_timestamp_str = input_data.get("last_timestamp", None)
+        if not last_timestamp_str:
+            raise ValueError("last_timestamp is required in the input data")
+        
+        last_timestamp = datetime.strptime(last_timestamp_str, "%Y-%m-%d %H:%M:%S")
+        
+        # Generate forecast dates starting from the next hour
+        forecast_dates = [
+            (last_timestamp + timedelta(hours=i+1)).strftime("%Y-%m-%d %H:%M:%S")
+            for i in range(steps)
+        ]
+        
         # Make predictions using the loaded SARIMAX model
         if exog_array is not None and exog_array.size > 0:
             predictions = model.forecast(steps=steps, exog=exog_array)
         else:
             predictions = model.forecast(steps=steps)
-        
-        # Generate forecast dates (assuming hourly frequency)
-        base_time = datetime.now()
-        forecast_dates = [
-            (base_time + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S")
-            for i in range(1, steps + 1)
-        ]
         
         return {
             "forecast": predictions.tolist(),
@@ -96,7 +102,7 @@ def predict_simple(input_data: Dict[str, Any]) -> Dict[str, Any]:
         # Make a simple forecast without exogenous variables
         predictions = model.forecast(steps=steps)
         
-        # Generate forecast dates (assuming hourly frequency)
+        # Generate forecast dates starting from current time (for simplicity)
         base_time = datetime.now()
         forecast_dates = [
             (base_time + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S")
