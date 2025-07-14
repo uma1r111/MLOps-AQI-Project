@@ -58,8 +58,10 @@ jobs:
       - name: Get latest SARIMAX BentoML model tag
         id: get_model_tag
         run: |
-          MODEL_TAG=$(bentoml models list | grep sarimax_model | sort -k4 | tail -n1 | awk '{print $1}')
+          # Use --output=json to get full tag without truncation
+          MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
           echo "MODEL_TAG=$MODEL_TAG" >> $GITHUB_ENV
+          echo "Found model tag: $MODEL_TAG"
 
       - name: Export SARIMAX model to .bentoml archive
         run: |
@@ -96,4 +98,3 @@ jobs:
             done
             echo "Cleanup complete."
           fi
-    
