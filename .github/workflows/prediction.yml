@@ -66,7 +66,12 @@ jobs:
       - name: Export SARIMAX model to .bentoml archive
         run: |
           echo "Using model tag: $MODEL_TAG"
-          bentoml models export "$MODEL_TAG" "sarimax_model_${MODEL_TAG//:/_}.bentoml"
+          # Extract just the hash part after the colon
+          MODEL_HASH=${MODEL_TAG#*:}
+          EXPORT_FILENAME="sarimax_model_${MODEL_HASH}.bentoml"
+          echo "Exporting to: $EXPORT_FILENAME"
+          bentoml models export "$MODEL_TAG" "$EXPORT_FILENAME"
+          echo "EXPORT_FILENAME=$EXPORT_FILENAME" >> $GITHUB_ENV
 
       - name: Upload SARIMAX model to S3
         env:
@@ -74,7 +79,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          aws s3 cp "sarimax_model_${MODEL_TAG//:/_}.bentoml" "s3://s3-bucket-umairrr/models/"
+          echo "Uploading: $EXPORT_FILENAME"
+          aws s3 cp "$EXPORT_FILENAME" "s3://s3-bucket-umairrr/models/"
 
       - name: Clean up older SARIMAX models from S3 (keep last 3)
         env:
