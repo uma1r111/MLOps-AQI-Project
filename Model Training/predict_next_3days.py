@@ -3,6 +3,7 @@ import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from datetime import timedelta
 import os
+import bentoml
 
 
 # ----------------------
@@ -82,13 +83,10 @@ val_exog = exog_features.iloc[train_size:].values
 
 print(f"Training size: {len(train_target)}, Validation size: {len(val_target)}")
 
-# ----------------------
-# Step 5: Train and evaluate both models
-# ----------------------
 models_results = {}
 
 for i, params in enumerate([best_params1, best_params2], 1):
-    print(f"\nTraining SARIMAX model {i} with params: {params}")
+    print(f"\n🔧 Training SARIMAX model {i} with params: {params}")
     
     try:
         # Train model
@@ -122,13 +120,13 @@ for i, params in enumerate([best_params1, best_params2], 1):
             'aic': aic
         }
         
-        print(f"Model {i} trained successfully!")
+        print(f"✅ Model {i} trained successfully!")
         print(f"   RMSE: {rmse:.4f}")
         print(f"   MAE: {mae:.4f}")
         print(f"   AIC: {aic:.4f}")
         
     except Exception as e:
-        print(f"Model {i} training failed: {e}")
+        print(f"❌ Model {i} training failed: {e}")
         continue
 
 # Select best model based on lowest RMSE
@@ -136,14 +134,14 @@ if models_results:
     best_model_name = min(models_results.keys(), key=lambda x: models_results[x]['rmse'])
     best_model_info = models_results[best_model_name]
     
-    print(f"\nBest model: {best_model_name}")
+    print(f"\n🏆 Best model: {best_model_name}")
     print(f"   Parameters: {best_model_info['params']}")
     print(f"   RMSE: {best_model_info['rmse']:.4f}")
     print(f"   MAE: {best_model_info['mae']:.4f}")
     print(f"   AIC: {best_model_info['aic']:.4f}")
     
     # Retrain best model on full dataset for final predictions
-    print(f"\nRetraining best model on full dataset...")
+    print(f"\n🔄 Retraining best model on full dataset...")
     final_model = SARIMAX(
         endog=target,
         exog=exog_features.values,
@@ -154,10 +152,30 @@ if models_results:
     )
     
     fitted_model = final_model.fit(disp=0, maxiter=50)
-    print("Final model trained on full dataset!")
-    
+    print("✅ Final model trained on full dataset!")
+
+    # Save the trained model with the legacy API
+    try:
+        from bentoml.picklable_model import save_model
+        saved_model = save_model(
+            "sarimax_model",
+            fitted_model,
+            metadata={
+                "model_type": "SARIMAX",
+                "best_params": best_model_info['params'],
+                "rmse": best_model_info['rmse'],
+                "mae": best_model_info['mae'],
+                "aic": best_model_info['aic'],
+                "features": list(exog_features.columns),
+                "target": target_col
+            }
+        )
+        print(f"✅ Model saved to BentoML: {saved_model}")
+    except Exception as e:
+        print(f"❌ Failed to save model: {e}")
+
 else:
-    print("No models trained successfully!")
+    print("❌ No models trained successfully!")
     exit(1)
 
 # ----------------------
@@ -223,4 +241,5 @@ if os.path.exists(prev_hash_file):
     else:
         print("New predictions generated. DVC will track the update.")
 else:
-    print("ℹFirst time tracking predictions.csv with DVC.")
+    print("First time tracking predictions.csv with DVC.")
+
