@@ -48,27 +48,52 @@ jobs:
           git commit -m "Update predictions.csv via DVC [skip ci]" || echo "No changes to commit"
           git push origin main
 
-      - name: ☁️ Push predictions data to S3 (via DVC)
+      - name: Push predictions data to S3 (via DVC)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: dvc push
 
-      - name: 🔍 Get latest SARIMAX BentoML model tag
+      - name: Get latest SARIMAX BentoML model tag
         id: get_model_tag
         run: |
-          MODEL_TAG=$(ls ~/.bentoml/models/sarimax_model | sort | tail -n 1)
+          MODEL_TAG=$(bentoml models list | grep sarimax_model | sort -k4 | tail -n1 | awk '{print $1}')
           echo "MODEL_TAG=$MODEL_TAG" >> $GITHUB_ENV
 
-      - name: 📦 Export SARIMAX model to .bentoml archive
+      - name: Export SARIMAX model to .bentoml archive
         run: |
-          bentoml models export "sarimax_model:$MODEL_TAG" "sarimax_model_$MODEL_TAG.bentoml"
+          echo "Using model tag: $MODEL_TAG"
+          bentoml models export "$MODEL_TAG" "sarimax_model_${MODEL_TAG//:/_}.bentoml"
 
-      - name: ☁️ Upload SARIMAX model to S3
+      - name: Upload SARIMAX model to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          aws s3 cp "sarimax_model_$MODEL_TAG.bentoml" "s3://s3-bucket-umairrr/models/"
+          aws s3 cp "sarimax_model_${MODEL_TAG//:/_}.bentoml" "s3://s3-bucket-umairrr/models/"
+
+      - name: Clean up older SARIMAX models from S3 (keep last 3)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          echo "Listing all SARIMAX model files in S3..."
+          files=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort)
+          total_files=$(echo "$files" | wc -l)
+          
+          echo "Total model files: $total_files"
+
+          if [ "$total_files" -le 3 ]; then
+            echo "Nothing to delete. Less than or equal to 3 models."
+          else
+            to_delete=$(echo "$files" | head -n $(($total_files - 3)) | awk '{print $4}')
+            for file in $to_delete; do
+              echo "Deleting $file..."
+              aws s3 rm "s3://s3-bucket-umairrr/models/$file"
+            done
+            echo "Cleanup complete."
+          fi
+    
