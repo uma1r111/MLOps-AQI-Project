@@ -5,25 +5,32 @@ on:
     branches:
       - main              # Trigger when code is pushed to main
   workflow_dispatch:      # Allow manual trigger from GitHub UI
+  schedule:
+    - cron: "0 9 * * *"   # Optional: Daily at 9 AM UTC (2 PM PKT)
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
   # Step 1: Run fetch + feature engg + selection in parallel
   trigger-parallel-jobs:
+    name: Run Fetch + Feature Engineering + Selection
     runs-on: ubuntu-latest
     steps:
-      - name: 🔁 Trigger Daily AQI & Weather Data Fetch
+      - name: Trigger Daily AQI & Weather Data Fetch
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Daily AQI & Weather Data Fetch
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🔁 Trigger Feature Engineering
+      - name: Trigger Feature Engineering
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Feature Engineering
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🔁 Trigger Feature Selection
+      - name: Trigger Feature Selection
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Feature Selection
@@ -31,18 +38,20 @@ jobs:
 
   # Step 2: Wait before triggering AQI Prediction
   wait-for-previous:
+    name: Wait for Upstream Jobs
     needs: trigger-parallel-jobs
     runs-on: ubuntu-latest
     steps:
-      - name: ⏳ Wait 5 minutes to allow upstream workflows to complete
-        run: sleep 300
+      - name: Sleep for 2 minutes
+        run: sleep 120
 
   # Step 3: Trigger AQI Prediction
   trigger-aqi-prediction:
+    name: Run AQI Prediction
     needs: wait-for-previous
     runs-on: ubuntu-latest
     steps:
-      - name: 🔁 Trigger AQI Prediction
+      - name: Trigger AQI Prediction
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: AQI Prediction
@@ -50,18 +59,20 @@ jobs:
 
   # Step 4: Wait again
   wait-for-prediction:
+    name: Wait for Prediction to Finish
     needs: trigger-aqi-prediction
     runs-on: ubuntu-latest
     steps:
-      - name: ⏳ Wait 10 minutes to allow prediction to complete
-        run: sleep 600
+      - name: Sleep for 2 minutes
+        run: sleep 120
 
   # Step 5: Trigger BentoML AQI Forecast
   trigger-bentoml:
+    name: Run BentoML Forecast
     needs: wait-for-prediction
     runs-on: ubuntu-latest
     steps:
-      - name: 🔁 Trigger BentoML AQI Forecast
+      - name: Trigger BentoML AQI Forecast
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: BentoML AQI Forecast
