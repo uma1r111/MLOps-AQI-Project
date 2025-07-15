@@ -1,0 +1,68 @@
+name: Master Orchestrator Pipeline
+
+on:
+  push:
+    branches:
+      - main              # Trigger when code is pushed to main
+  workflow_dispatch:      # Allow manual trigger from GitHub UI
+
+jobs:
+  # Step 1: Run fetch + feature engg + selection in parallel
+  trigger-parallel-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔁 Trigger Daily AQI & Weather Data Fetch
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Daily AQI & Weather Data Fetch
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔁 Trigger Feature Engineering
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Feature Engineering
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔁 Trigger Feature Selection
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Feature Selection
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Step 2: Wait before triggering AQI Prediction
+  wait-for-previous:
+    needs: trigger-parallel-jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⏳ Wait 5 minutes to allow upstream workflows to complete
+        run: sleep 300
+
+  # Step 3: Trigger AQI Prediction
+  trigger-aqi-prediction:
+    needs: wait-for-previous
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔁 Trigger AQI Prediction
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: AQI Prediction
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Step 4: Wait again
+  wait-for-prediction:
+    needs: trigger-aqi-prediction
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⏳ Wait 10 minutes to allow prediction to complete
+        run: sleep 600
+
+  # Step 5: Trigger BentoML AQI Forecast
+  trigger-bentoml:
+    needs: wait-for-prediction
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔁 Trigger BentoML AQI Forecast
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: BentoML AQI Forecast
+          token: ${{ secrets.GITHUB_TOKEN }}
