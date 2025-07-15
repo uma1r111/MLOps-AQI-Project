@@ -22,19 +22,19 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Daily AQI & Weather Data Fetch
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Trigger Feature Engineering
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Feature Engineering
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Trigger Feature Selection
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Feature Selection
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
   # Step 2: Wait before triggering AQI Prediction
   wait-for-previous:
@@ -55,7 +55,7 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: AQI Prediction
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
   # Step 4: Wait again
   wait-for-prediction:
@@ -76,4 +76,4 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: BentoML AQI Forecast
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
