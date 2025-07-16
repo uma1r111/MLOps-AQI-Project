@@ -2,8 +2,8 @@ name: BentoML AQI Forecast
 
 on:
   push:
-    branches:
-      - main             # Triggers when code is pushed to main
+    # branches:
+    #   - main             # Triggers when code is pushed to main
   # schedule:
   #   - cron: "0 13 * * *"  # Runs daily at 13 AM UTC == 6 PM PKT
   workflow_dispatch:     # Allows manual triggering from GitHub UI
