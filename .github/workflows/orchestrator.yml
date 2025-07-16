@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 jobs:
-  # Step 1: Run fetch + feature engg + selection in parallel
+  # Step 1: Run fetch + feature eng + selection in parallel
   trigger-parallel-jobs:
     name: Run Fetch + Feature Engineering + Selection
     runs-on: ubuntu-latest
