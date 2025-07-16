@@ -34,4 +34,5 @@ jobs:
             git config --global user.email "github-actions@github.com"
             git add karachi_weather_apr1_to_current.csv
             git commit -m "Daily update: AQI + Weather data" || echo "No changes to commit"
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+            git pull --rebase origin main || true
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main || true
