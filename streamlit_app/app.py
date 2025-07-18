@@ -125,23 +125,23 @@ for i, day in enumerate(unique_days):
                 icon = "☀️" if is_daytime(row["hour"]) else "🌙"
                 
 
-                # Match weather
-                weather_row = weather_day_data[weather_day_data['timestamp'] == row['timestamp']]
-                weather_info = ""
-                if not weather_row.empty:
-                    w = weather_row.iloc[0]
-                    temp = w.get("temp_C", "N/A")
-                    wind = w.get("windspeed_kph", "N/A")
-                    humidity = w.get("humidity_%", "N/A")
-                    precip = w.get("precip_mm", "N/A")
-                    weather_info = f"""
-                        <div class="weather-info">
-                            <div class="weather-item">🌡️ {temp}°C</div>
-                            <div class="weather-item">💨 {wind} km/h</div>
-                            <div class="weather-item">💧 {humidity}%</div>
-                            <div class="weather-item">☔ {precip} mm</div>
-                        </div>
-                    """
+                # # Match weather
+                # weather_row = weather_day_data[weather_day_data['timestamp'] == row['timestamp']]
+                # weather_info = ""
+                # if not weather_row.empty:
+                #     w = weather_row.iloc[0]
+                #     temp = w.get("temp_C", "N/A")
+                #     wind = w.get("windspeed_kph", "N/A")
+                #     humidity = w.get("humidity_%", "N/A")
+                #     precip = w.get("precip_mm", "N/A")
+                #     weather_info = f"""
+                #         <div class="weather-info">
+                #             <div class="weather-item">🌡️ {temp}°C</div>
+                #             <div class="weather-item">💨 {wind} km/h</div>
+                #             <div class="weather-item">💧 {humidity}%</div>
+                #             <div class="weather-item">☔ {precip} mm</div>
+                #         </div>
+                #     """
 
                 with col:
                     st.markdown(f"""
@@ -150,7 +150,7 @@ for i, day in enumerate(unique_days):
                             <div class="hour-icon">{icon}</div>
                             <div class="aqi-value {get_aqi_class(aqi_value)}">{aqi_value}</div>
                             <div class="aqi-category">{category}</div>
-                            {weather_info}
+                            
                         </div>
                     """, unsafe_allow_html=True)
 
