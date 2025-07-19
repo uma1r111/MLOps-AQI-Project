@@ -1,12 +1,16 @@
-name: AQI Prediction
+name: Model Save
 
 on:
   push:
-    # branches:
-    #   - main             # Triggers when code is pushed to main
-  # schedule:
-  #   - cron: "0 12 * * *"  # Runs daily at 12 AM UTC == 5 PM PKT
+    branches:
+      - main             # Triggers when code is pushed to main
+  schedule:
+    - cron: "0 12 * * *"  # Runs daily at 12 AM UTC == 5 PM PKT
   workflow_dispatch:     # Allows manual triggering from GitHub UI
+  workflow_run:            # NEW: Triggers when Feature Selection completes
+    workflows: ["Feature Selection"]
+    types:
+      - completed
 
 jobs:
   aqi-prediction:
@@ -47,11 +51,9 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git pull --rebase origin main
           git add predictions.csv.dvc .gitignore
           git commit -m "Update predictions.csv via DVC [skip ci]" || echo "No changes to commit"
           git push origin main
-
 
       - name: Push predictions data to S3 (via DVC)
         env:

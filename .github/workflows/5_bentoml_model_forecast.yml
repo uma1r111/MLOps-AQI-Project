@@ -1,12 +1,16 @@
-name: BentoML AQI Forecast
+name: BentoML Model Forecast
 
 on:
   push:
-    # branches:
-    #   - main             # Triggers when code is pushed to main
-  # schedule:
-  #   - cron: "0 13 * * *"  # Runs daily at 13 AM UTC == 6 PM PKT
+    branches:
+      - main             # Triggers when code is pushed to main
+  schedule:
+    - cron: "0 13 * * *"  # Runs daily at 13 AM UTC == 6 PM PKT
   workflow_dispatch:     # Allows manual triggering from GitHub UI
+  workflow_run:            # NEW: Triggers when Model Save completes
+    workflows: ["Model Save"]
+    types:
+      - completed
 
 jobs:
   bentoml-forecast:
@@ -116,7 +120,7 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git pull --rebase origin main
           git add bentoml_forecast_output.csv
           git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
           git push origin main
+

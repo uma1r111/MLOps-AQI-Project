@@ -2,11 +2,15 @@ name: Feature Selection
 
 on:
   push:
-    # branches:
-    #   - main             # Triggers when code is pushed to main
-  # schedule:
-  #   - cron: "0 11 * * *"  # Runs daily at 11 AM UTC == 4 PM PKT
+    branches:
+      - main             # Triggers when code is pushed to main
+  schedule:
+    - cron: "0 11 * * *"  # Runs daily at 11 AM UTC == 4 PM PKT
   workflow_dispatch:     # Allows manual triggering from GitHub UI
+  workflow_run:            # NEW: Triggers when Feature Engineering completes
+    workflows: ["Feature Engineering"]
+    types:
+      - completed
 
 jobs:
   feature-selection:
@@ -50,8 +54,6 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git fetch origin
-          git merge --strategy-option=theirs origin/main || true
           git add feature_selection.csv.dvc .gitignore
           git commit -m "Update DVC-tracked feature_selection.csv [skip ci]" || echo "No changes to commit"
           git push origin main
@@ -62,3 +64,5 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: dvc push
+
+
