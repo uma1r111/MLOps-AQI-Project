@@ -1,16 +1,12 @@
 name: Model Save
 
 on:
-  push:
-    branches:
-      - main             # Triggers when code is pushed to main
-  schedule:
-    - cron: "0 12 * * *"  # Runs daily at 12 AM UTC == 5 PM PKT
-  workflow_dispatch:     # Allows manual triggering from GitHub UI
-  workflow_run:            # NEW: Triggers when Feature Selection completes
+  workflow_run: # Triggers when Feature Selection completes
     workflows: ["Feature Selection"]
     types:
       - completed
+  workflow_dispatch: # Allows manual triggering
+
 
 jobs:
   aqi-prediction:

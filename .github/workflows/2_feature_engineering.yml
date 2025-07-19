@@ -1,16 +1,12 @@
 name: Feature Engineering
 
 on:
-  push:
-    branches:
-      - main             # Triggers when code is pushed to main
-  schedule:
-    - cron: "0 10 * * *"  # Runs daily at 10 AM UTC == 3 PM PKT
-  workflow_dispatch:     # Allows manual triggering from GitHub UI
-  workflow_run:            # NEW: Triggers when Daily Data Collection completes
+  workflow_run: # Triggers when Daily Data Collection completes
     workflows: ["Daily Data Collection"]
     types:
       - completed
+  workflow_dispatch: # Allows manual triggering
+
 
 jobs:
   feature-engineering:
