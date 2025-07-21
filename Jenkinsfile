@@ -2,7 +2,7 @@ pipeline {
     agent none
 
     environment {
-        GITHUB_PAT = credentials('github-pat') // GitHub PAT for pushing files
+        GITHUB_PAT = credentials('github-token') // GitHub PAT for pushing files
     }
 
     stages {
@@ -75,7 +75,7 @@ pipeline {
                 AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')        // Add in Jenkins > Credentials
                 AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
                 AWS_DEFAULT_REGION = 'us-east-1'
-                GITHUB_PAT = credentials('github-pat')                       // GitHub PAT for pushing to repo
+                GITHUB_PAT = credentials('github-token')                       // GitHub PAT for pushing to repo
             }
             steps {
                 sh '''
@@ -116,7 +116,7 @@ pipeline {
                 AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
                 AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
                 AWS_DEFAULT_REGION = 'us-east-1'
-                GITHUB_PAT = credentials('github-pat')
+                GITHUB_PAT = credentials('github-token')
             }
             steps {
                 sh '''
@@ -185,7 +185,7 @@ pipeline {
             AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
             AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
             AWS_DEFAULT_REGION = 'us-east-1'
-            GITHUB_PAT = credentials('github-pat')
+            GITHUB_PAT = credentials('github-token')
             }
              steps {
                 sh '''
