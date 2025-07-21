@@ -18,15 +18,19 @@ pipeline {
             steps {
                 sh '''
                 pip install --upgrade pip
-                pip install pandas requests dvc[s3] boto3
-                python 1_data_collection.py
-                dvc add data/raw_data.csv
+                pip install -r requirements.txt
+
+                # Run daily fetch script
+                python fetch_daily_data.py
+
+                # Git config and commit logic
                 git config --global user.name "jenkins-bot"
                 git config --global user.email "jenkins@example.com"
-                git add data/raw_data.csv.dvc
-                git commit -m "Update raw data [CI]"
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
-                '''
+                git add karachi_weather_apr1_to_current.csv
+                git commit -m "Daily update: AQI + Weather data" || echo "No changes to commit"
+                git pull --rebase origin main || true
+                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+            '''
             }
         }
 
@@ -40,14 +44,22 @@ pipeline {
             }
             steps {
                 sh '''
-                pip install pandas numpy dvc[s3]
-                dvc pull data/raw_data.csv.dvc
-                python 2_feature_engineering.py
-                dvc add data/feature_data.csv
-                git add data/feature_data.csv.dvc
-                git commit -m "Update feature data [CI]"
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
-                '''
+                # Install dependencies
+                python -m pip install --upgrade pip
+                pip install -r requirements.txt
+
+                # Run data quality check and feature engineering scripts
+                python "Data Preprocessing/data_quality_check.py"
+                python "Data Preprocessing/run_preprocessing.py"
+
+                # Git commit and push
+                git config --global user.name "jenkins-bot"
+                git config --global user.email "jenkins@example.com"
+                git add full_preprocessed_aqi_weather_data_with_all_features.csv
+                git commit -m "Daily update: Feature engineered AQI + weather data" || echo "No changes to commit"
+                git pull --rebase origin main || true
+                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+            '''
             }
         }
 
@@ -59,33 +71,104 @@ pipeline {
                     args '-u root:root'
                 }
             }
+             environment {
+                AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')        // Add in Jenkins > Credentials
+                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+                AWS_DEFAULT_REGION = 'us-east-1'
+                GITHUB_PAT = credentials('github-pat')                       // GitHub PAT for pushing to repo
+            }
             steps {
                 sh '''
-                pip install dvc[s3]
+                # Optional: re-authenticate git (in case Jenkins doesnt inherit global config)
+                git config --global user.name "jenkins-bot"
+                git config --global user.email "jenkins@example.com"
+
+                # Pull latest feature_data.csv from DVC remote
                 dvc pull data/feature_data.csv.dvc
+
+                # Run feature selection
                 python 3_feature_selection.py
+
+                # Track the new/updated output
                 dvc add feature_selection.csv
-                git add feature_selection.csv.dvc
-                git commit -m "Update feature selection output [CI]"
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
-                '''
+
+                # Commit & push DVC metadata
+                git add feature_selection.csv.dvc .gitignore
+                git commit -m "Update feature selection output [CI]" || echo "No changes to commit"
+                git pull --rebase origin main || true
+                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+
+                # Push data to S3
+                dvc push
+            '''
             }
         }
 
-        // STAGE 4: Model Save
-        stage('Model Save') {
+        // STAGE 4: Model Training and Serving
+        stage('Model Training and Serving') {
             agent {
                 docker {
                     image 'shaikhhumair/aqi-pipeline:latest'
                     args '-u root:root'
                 }
             }
+            environment {
+                AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
+                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+                AWS_DEFAULT_REGION = 'us-east-1'
+                GITHUB_PAT = credentials('github-pat')
+            }
             steps {
                 sh '''
-                pip install dvc[s3] boto3
-                dvc pull feature_selection.csv.dvc
-                python 4_model_save.py
-                aws s3 cp sarimax_model_*.pkl s3://s3-bucket-umairrr/models/
+                # Git config
+                git config --global user.name "jenkins-bot"
+                git config --global user.email "jenkins@example.com"
+
+                # Pull feature_selection.csv from S3 (via DVC)
+                dvc pull
+
+                # Run AQI prediction script (generates predictions.csv)
+                python "Model Training/predict_next_3days.py"
+
+                # Track predictions.csv with DVC
+                dvc add predictions.csv
+
+                # Commit DVC metadata
+                git add predictions.csv.dvc .gitignore
+                git commit -m "Update predictions.csv via DVC [CI]" || echo "No changes to commit"
+                git pull --rebase origin main || true
+                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+
+                # Push predictions.csv to S3 via DVC
+                dvc push
+
+                # Get latest SARIMAX BentoML model tag
+                MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
+                echo "MODEL_TAG=${MODEL_TAG}"
+                
+                # Export model to .bentomodel archive
+                MODEL_HASH=${MODEL_TAG#*:}
+                EXPORT_BASE="sarimax_model_${MODEL_HASH}"
+                ACTUAL_FILENAME="${EXPORT_BASE}.bentomodel"
+                bentoml models export "$MODEL_TAG" "$EXPORT_BASE"
+
+                # Upload SARIMAX model to S3
+                aws s3 cp "$ACTUAL_FILENAME" "s3://s3-bucket-umairrr/models/"
+
+                # Clean up older SARIMAX models (keep last 3)
+                files=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort)
+                total_files=$(echo "$files" | wc -l)
+
+                if [ "$total_files" -le 3 ]; then
+                    echo "Nothing to delete. Less than or equal to 3 models."
+                else
+                    to_delete=$(echo "$files" | head -n $(($total_files - 3)) | awk '{print $4}')
+                    for file in $to_delete; do
+                        echo "Deleting $file..."
+                        aws s3 rm "s3://s3-bucket-umairrr/models/$file"
+                    done
+                    echo "Cleanup complete."
+                fi
                 '''
             }
         }
@@ -98,32 +181,87 @@ pipeline {
                     args '-u root:root'
                 }
             }
-            steps {
+            environment {
+            AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
+            AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+            AWS_DEFAULT_REGION = 'us-east-1'
+            GITHUB_PAT = credentials('github-pat')
+            }
+             steps {
                 sh '''
-                pip install bentoml==1.2.0 dvc[s3] pandas numpy scikit-learn statsmodels requests
+                echo "Pulling feature_selection.csv from S3 via DVC..."
                 dvc pull feature_selection.csv.dvc
                 
-                MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
-                aws s3 cp "s3://s3-bucket-umairrr/models/$MODEL" ./
+                echo "Getting latest SARIMAX model from S3..."
+                LATEST_MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
+                echo "Latest model: $LATEST_MODEL"
                 
-                bentoml models import "$MODEL"
+                if [ -z "$LATEST_MODEL" ]; then
+                    echo "No SARIMAX model found in S3"
+                    exit 1
+                fi
+                
+                echo "Downloading $LATEST_MODEL..."
+                aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./
+                
+                echo "Importing BentoML model: $LATEST_MODEL"
+                bentoml models import "$LATEST_MODEL"
+                
                 MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
-
-                cp Model\ Serving/service.py ./service.py
-                nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml.log 2>&1 &
+                echo "Imported model tag: $MODEL_TAG"
                 
-                sleep 15
+                echo "Copying service file..."
+                cp "Model Serving/service.py" ./service.py
+                echo "Copied service.py from Model Serving folder"
+                
+                echo "Starting BentoML service with model: $MODEL_TAG"
+                nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
+                
+                echo "Waiting for BentoML service to start..."
+                for i in {1..30}; do
+                    if curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
+                        echo "BentoML service is running"
+                        break
+                    fi
+                    echo "Attempt $i: Service not ready yet, waiting..."
+                    sleep 3
+                done
+                
+                # Check if service is actually running
+                if ! curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
+                    echo "BentoML service failed to start"
+                    echo "Service logs:"
+                    cat bentoml_service.log || echo "No log file found"
+                    echo "Process list:"
+                    ps aux | grep bentoml || true
+                    exit 1
+                fi
+                
+                echo "Testing service..."
                 curl -X POST http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}'
-                python Prediction\ Client/run_prediction_client.py
                 
-                pkill -f "bentoml serve" || true
-
-                git config --global user.name "jenkins-bot"
-                git config --global user.email "jenkins@example.com"
-                git add bentoml_forecast_output.csv
-                git commit -m "Update forecast output [CI]"
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
+                echo "Running BentoML prediction client..."
+                python "Prediction Client/run_prediction_client.py"
                 '''
+            }
+            post {
+                always {
+                    sh '''
+                    echo "Stopping BentoML service..."
+                    pkill -f "bentoml serve" || true
+                    echo "Service stopped"
+                    '''
+                }
+                success {
+                    sh '''
+                    echo "Committing updated forecast output to GitHub..."
+                    git config --global user.name "jenkins-bot"
+                    git config --global user.email "jenkins@example.com"
+                    git add bentoml_forecast_output.csv
+                    git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
+                    git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
+                    '''
+                }
             }
         }
     }
