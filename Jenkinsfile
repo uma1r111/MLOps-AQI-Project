@@ -315,20 +315,32 @@ pipeline {
                         exit 1
                     fi
                     
-                    echo "Downloading $LATEST_MODEL..."
-                    aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./ --region "$AWS_DEFAULT_REGION"
+                    # Extract model hash from filename for checking if already exists
+                    MODEL_HASH=$(echo "$LATEST_MODEL" | sed 's/sarimax_model_\\(.*\\)\\.bentomodel/\\1/')
+                    MODEL_TAG="sarimax_model:$MODEL_HASH"
+                    echo "Expected model tag: $MODEL_TAG"
                     
-                    echo "Importing BentoML model: $LATEST_MODEL"
-                    bentoml models import "$LATEST_MODEL"
+                    # Check if model already exists in BentoML store
+                    if bentoml models list --output=json | jq -e ".[] | select(.tag == \\"$MODEL_TAG\\")" > /dev/null; then
+                        echo "Model $MODEL_TAG already exists in BentoML store, skipping import"
+                    else
+                        echo "Downloading $LATEST_MODEL..."
+                        aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./ --region "$AWS_DEFAULT_REGION"
+                        
+                        echo "Importing BentoML model: $LATEST_MODEL"
+                        bentoml models import "$LATEST_MODEL"
+                        echo "Model imported successfully"
+                    fi
                     
-                    MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
-                    echo "Imported model tag: $MODEL_TAG"
+                    # Get the actual model tag (whether imported or already existed)
+                    ACTUAL_MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
+                    echo "Using model tag: $ACTUAL_MODEL_TAG"
                     
                     echo "Copying service file..."
                     cp "Model Serving/service.py" ./service.py
                     echo "Copied service.py from Model Serving folder"
                     
-                    echo "Starting BentoML service with model: $MODEL_TAG"
+                    echo "Starting BentoML service with model: $ACTUAL_MODEL_TAG"
                     nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
                     
                     echo "Waiting for BentoML service to start..."
