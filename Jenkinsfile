@@ -97,13 +97,12 @@ pipeline {
             agent any
             environment {
                 VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
+                AWS_ACCESS_KEY_ID     = credentials('aws-credentials')    // Jenkins Credentials (ID = aws-credentials)
+                AWS_SECRET_ACCESS_KEY = credentials('aws-credentials')    // Same ID used for both
+                AWS_DEFAULT_REGION    = 'us-east-1'
+                GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
-             environment {
-                AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')        // Add in Jenkins > Credentials
-                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-                AWS_DEFAULT_REGION = 'us-east-1'
-                GITHUB_PAT = credentials('github-token')                       // GitHub PAT for pushing to repo
-            }
+
             steps {
                 sh '''
                 echo "[INFO] Activating Heavy virtual environment..."
@@ -139,12 +138,10 @@ pipeline {
             agent any
             environment {
                 VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
-            }
-            environment {
-                AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
-                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-                AWS_DEFAULT_REGION = 'us-east-1'
-                GITHUB_PAT = credentials('github-token')
+                AWS_ACCESS_KEY_ID     = credentials('aws-credentials')    // Jenkins Credentials (ID = aws-credentials)
+                AWS_SECRET_ACCESS_KEY = credentials('aws-credentials')    // Same ID used for both
+                AWS_DEFAULT_REGION    = 'us-east-1'
+                GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
             steps {
                 sh '''
@@ -208,13 +205,12 @@ pipeline {
             agent any
             environment {
                 VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
+                AWS_ACCESS_KEY_ID     = credentials('aws-credentials')    // Jenkins Credentials (ID = aws-credentials)
+                AWS_SECRET_ACCESS_KEY = credentials('aws-credentials')    // Same ID used for both
+                AWS_DEFAULT_REGION    = 'us-east-1'
+                GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
-            environment {
-            AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
-            AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-            AWS_DEFAULT_REGION = 'us-east-1'
-            GITHUB_PAT = credentials('github-token')
-            }
+            
              steps {
                 sh '''
                 echo "[INFO] Activating Heavy virtual environment..."
