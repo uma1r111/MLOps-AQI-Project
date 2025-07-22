@@ -32,9 +32,12 @@ pipeline {
                     python3 -m venv $VENV_HEAVY
                     . $VENV_HEAVY/bin/activate
                     pip install --upgrade pip
-                    pip install dvc[s3] boto3 s3fs pandas numpy scikit-learn statsmodels bentoml
+                    pip install dvc[s3] boto3 s3fs pandas numpy scikit-learn statsmodels bentoml awscli
                 else
                     echo "[INFO] Heavy env already exists."
+                    # Ensure awscli is installed in existing environment
+                    . $VENV_HEAVY/bin/activate
+                    pip install awscli || echo "awscli already installed"
                 fi
                 '''
             }
@@ -107,6 +110,17 @@ pipeline {
                     echo "[INFO] Activating Heavy virtual environment..."
                     source "${VENV_HEAVY}/bin/activate"
 
+                    # Export AWS credentials for this session
+                    export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+                    export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+                    export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
+
+                    # Ensure AWS CLI is installed
+                    if ! command -v aws &> /dev/null; then
+                        echo "[INFO] Installing AWS CLI in virtual environment..."
+                        pip install awscli
+                    fi
+
                     # Debug AWS credentials (safer approach)
                     echo "[DEBUG] AWS Access Key ID: $(echo $AWS_ACCESS_KEY_ID | cut -c1-4)****"
                     echo "[DEBUG] AWS Region: $AWS_DEFAULT_REGION"
@@ -130,7 +144,7 @@ pipeline {
                         dvc remote modify myremote region "$AWS_DEFAULT_REGION"
                     fi
 
-                    # Pull latest feature_data.csv from DVC remote (fixed typo: dvc not dve)
+                    # Pull latest feature_data.csv from DVC remote
                     echo "[INFO] Pulling feature selection data from DVC remote..."
                     if ! dvc pull feature_selection.csv.dvc; then
                         echo "[WARNING] Could not pull feature_selection.csv.dvc. File might not exist yet."
@@ -178,6 +192,17 @@ pipeline {
                     echo "[INFO] Activating Heavy virtual environment..."
                     source "${VENV_HEAVY}/bin/activate"
                     
+                    # Export AWS credentials for this session
+                    export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+                    export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+                    export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
+
+                    # Ensure AWS CLI is available
+                    if ! command -v aws &> /dev/null; then
+                        echo "[INFO] Installing AWS CLI in virtual environment..."
+                        pip install awscli
+                    fi
+                    
                     # Git config
                     git config --global user.name "jenkins-bot"
                     git config --global user.email "jenkins@example.com"
@@ -217,7 +242,7 @@ pipeline {
                         exit 1
                     fi
                     
-                    # Export model to .bentomodel archive (safer parameter expansion)
+                    # Export model to .bentomodel archive
                     MODEL_HASH=$(echo "$MODEL_TAG" | cut -d':' -f2)
                     EXPORT_BASE="sarimax_model_${MODEL_HASH}"
                     ACTUAL_FILENAME="${EXPORT_BASE}.bentomodel"
@@ -236,7 +261,6 @@ pipeline {
                     if [ "$total_files" -le 3 ]; then
                         echo "Nothing to delete. Less than or equal to 3 models."
                     else
-                        # Use head and tail for safer arithmetic
                         files_to_delete=$(echo "$files" | head -n -3)
                         echo "$files_to_delete" | while read -r line; do
                             if [ -n "$line" ]; then
@@ -267,6 +291,17 @@ pipeline {
                     set -e
                     echo "[INFO] Activating Heavy virtual environment..."
                     source "${VENV_HEAVY}/bin/activate"
+                    
+                    # Export AWS credentials for this session
+                    export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+                    export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+                    export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
+
+                    # Ensure AWS CLI is available
+                    if ! command -v aws &> /dev/null; then
+                        echo "[INFO] Installing AWS CLI in virtual environment..."
+                        pip install awscli
+                    fi
                     
                     echo "Pulling feature_selection.csv from S3 via DVC..."
                     dvc pull feature_selection.csv.dvc
