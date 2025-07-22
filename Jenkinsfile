@@ -113,10 +113,10 @@ pipeline {
                 git config --global user.email "jenkins@example.com"
 
                 # Pull latest feature_data.csv from DVC remote
-                dvc pull data/feature_data.csv.dvc
+                dvc pull feature_selection.csv.dvc
 
                 # Run feature selection
-                python 3_feature_selection.py
+                python "Feature Selection/feature_selection.py"
 
                 # Track the new/updated output
                 dvc add feature_selection.csv
@@ -210,7 +210,7 @@ pipeline {
                 AWS_DEFAULT_REGION    = 'us-east-1'
                 GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
-            
+
              steps {
                 sh '''
                 echo "[INFO] Activating Heavy virtual environment..."
