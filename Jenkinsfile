@@ -7,18 +7,50 @@ pipeline {
 
     stages {
 
-        // STAGE 1: Data Collection
-        stage('Data Collection') {
-            agent {
-                docker {
-                    image 'python:3.11'
-                    args '-u root:root'
-                }
+        stage('Setup Environments') {
+            agent any
+            environment {
+                VENV_LIGHT = "${HOME}/.venv-aqi-light"
+                VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
             }
             steps {
                 sh '''
-                pip install --upgrade pip
-                pip install -r requirements.txt
+                echo "[INFO] Setting up virtual environments..."
+
+                # LIGHT env: for Stage 1 & 2
+                if [ ! -d "$VENV_LIGHT" ]; then
+                    python3 -m venv $VENV_LIGHT
+                    . $VENV_LIGHT/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                else
+                    echo "[INFO] Light env already exists."
+                fi
+
+                # HEAVY env: for Stage 3-5
+                if [ ! -d "$VENV_HEAVY" ]; then
+                    python3 -m venv $VENV_HEAVY
+                    . $VENV_HEAVY/bin/activate
+                    pip install --upgrade pip
+                    pip install dvc[s3] boto3 s3fs pandas numpy scikit-learn statsmodels bentoml
+                else
+                    echo "[INFO] Heavy env already exists."
+                fi
+                '''
+            }
+        }
+
+
+        // STAGE 1: Data Collection
+        stage('Data Collection') {
+           agent any
+            environment {
+                VENV_LIGHT = "${HOME}/.venv-aqi-light"
+            }
+            steps {
+                sh '''
+                echo "[INFO] Activating light virtual environment..."
+                . $VENV_LIGHT/bin/activate
 
                 # Run daily fetch script
                 python fetch_daily_data.py
@@ -36,17 +68,14 @@ pipeline {
 
         // STAGE 2: Feature Engineering
         stage('Feature Engineering') {
-            agent {
-                docker {
-                    image 'python:3.11'
-                    args '-u root:root'
-                }
+            agent any
+            environment {
+                VENV_LIGHT = "${HOME}/.venv-aqi-light"
             }
             steps {
                 sh '''
-                # Install dependencies
-                python -m pip install --upgrade pip
-                pip install -r requirements.txt
+                echo "[INFO] Activating light virtual environment..."
+                . $VENV_LIGHT/bin/activate
 
                 # Run data quality check and feature engineering scripts
                 python "Data Preprocessing/data_quality_check.py"
@@ -65,11 +94,9 @@ pipeline {
 
         // STAGE 3: Feature Selection
         stage('Feature Selection') {
-            agent {
-                docker {
-                    image 'shaikhhumair/aqi-pipeline:latest'
-                    args '-u root:root'
-                }
+            agent any
+            environment {
+                VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
             }
              environment {
                 AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')        // Add in Jenkins > Credentials
@@ -79,6 +106,9 @@ pipeline {
             }
             steps {
                 sh '''
+                echo "[INFO] Activating Heavy virtual environment..."
+                . $VENV_HEAVY/bin/activate
+
                 # Optional: re-authenticate git (in case Jenkins doesnt inherit global config)
                 git config --global user.name "jenkins-bot"
                 git config --global user.email "jenkins@example.com"
@@ -106,11 +136,9 @@ pipeline {
 
         // STAGE 4: Model Training and Serving
         stage('Model Training and Serving') {
-            agent {
-                docker {
-                    image 'shaikhhumair/aqi-pipeline:latest'
-                    args '-u root:root'
-                }
+            agent any
+            environment {
+                VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
             }
             environment {
                 AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
@@ -120,6 +148,8 @@ pipeline {
             }
             steps {
                 sh '''
+                echo "[INFO] Activating Heavy virtual environment..."
+                . $VENV_HEAVY/bin/activate
                 # Git config
                 git config --global user.name "jenkins-bot"
                 git config --global user.email "jenkins@example.com"
@@ -175,11 +205,9 @@ pipeline {
 
         // STAGE 5: BentoML Forecast & Push Output
         stage('BentoML Forecast') {
-            agent {
-                docker {
-                    image 'shaikhhumair/aqi-pipeline:latest'
-                    args '-u root:root'
-                }
+            agent any
+            environment {
+                VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
             }
             environment {
             AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
@@ -189,6 +217,9 @@ pipeline {
             }
              steps {
                 sh '''
+                echo "[INFO] Activating Heavy virtual environment..."
+                . $VENV_HEAVY/bin/activate
+                
                 echo "Pulling feature_selection.csv from S3 via DVC..."
                 dvc pull feature_selection.csv.dvc
                 
