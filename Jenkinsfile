@@ -105,6 +105,7 @@ pipeline {
 
             steps {
                 sh '''
+                set -x  # Echo each command
                 echo "[INFO] Activating Heavy virtual environment..."
                 . $VENV_HEAVY/bin/activate
 
