@@ -6,6 +6,20 @@ pipeline {
     }
 
     stages {
+        // Add explicit checkout stage with credentials
+        stage('Checkout') {
+            agent any
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/uma1r111/10pearls-AQI-Project-.git',
+                        credentialsId: 'github-token'
+                    ]]
+                ])
+            }
+        }
 
         stage('Setup Environments') {
             agent any
@@ -40,7 +54,6 @@ pipeline {
             }
         }
 
-
         // STAGE 1: Data Collection
         stage('Data Collection') {
            agent any
@@ -48,21 +61,25 @@ pipeline {
                 VENV_LIGHT = "${HOME}/.venv-aqi-light"
             }
             steps {
-                sh '''
-                echo "[INFO] Activating light virtual environment..."
-                . $VENV_LIGHT/bin/activate
+                script {
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                        echo "[INFO] Activating light virtual environment..."
+                        . $VENV_LIGHT/bin/activate
 
-                # Run daily fetch script
-                python fetch_daily_data.py
+                        # Run daily fetch script
+                        python fetch_daily_data.py
 
-                # Git config and commit logic
-                git config --global user.name "jenkins-bot"
-                git config --global user.email "jenkins@example.com"
-                git add karachi_weather_apr1_to_current.csv
-                git commit -m "Daily update: AQI + Weather data" || echo "No changes to commit"
-                git pull --rebase origin main || true
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
-            '''
+                        # Git config and commit logic
+                        git config --local user.name "jenkins-bot"
+                        git config --local user.email "jenkins@example.com"
+                        git add karachi_weather_apr1_to_current.csv
+                        git commit -m "Daily update: AQI + Weather data" || echo "No changes to commit"
+                        git pull --rebase origin main || true
+                        git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+                        '''
+                    }
+                }
             }
         }
 
@@ -73,22 +90,26 @@ pipeline {
                 VENV_LIGHT = "${HOME}/.venv-aqi-light"
             }
             steps {
-                sh '''
-                echo "[INFO] Activating light virtual environment..."
-                . $VENV_LIGHT/bin/activate
+                script {
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                        echo "[INFO] Activating light virtual environment..."
+                        . $VENV_LIGHT/bin/activate
 
-                # Run data quality check and feature engineering scripts
-                python "Data Preprocessing/data_quality_check.py"
-                python "Data Preprocessing/run_preprocessing.py"
+                        # Run data quality check and feature engineering scripts
+                        python "Data Preprocessing/data_quality_check.py"
+                        python "Data Preprocessing/run_preprocessing.py"
 
-                # Git commit and push
-                git config --global user.name "jenkins-bot"
-                git config --global user.email "jenkins@example.com"
-                git add full_preprocessed_aqi_weather_data_with_all_features.csv
-                git commit -m "Daily update: Feature engineered AQI + weather data" || echo "No changes to commit"
-                git pull --rebase origin main || true
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
-            '''
+                        # Git commit and push
+                        git config --local user.name "jenkins-bot"
+                        git config --local user.email "jenkins@example.com"
+                        git add full_preprocessed_aqi_weather_data_with_all_features.csv
+                        git commit -m "Daily update: Feature engineered AQI + weather data" || echo "No changes to commit"
+                        git pull --rebase origin main || true
+                        git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+                        '''
+                    }
+                }
             }
         }
 
@@ -100,25 +121,21 @@ pipeline {
                 AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
                 AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')   
                 AWS_DEFAULT_REGION    = 'us-east-1'
-                GITHUB_PAT            = credentials('github-token')
             }
             steps {
                 script {
-                    // Use Jenkins Git plugin's withCredentials for proper authentication
                     withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                         sh '''
                         set -x  # Echo each command
                         echo "[INFO] Activating Heavy virtual environment..."
                         . $VENV_HEAVY/bin/activate
                         
-                        # Configure git with credentials
+                        # Configure git
                         git config --local user.name "jenkins-bot"
                         git config --local user.email "jenkins@example.com"
-                        git config --local credential.helper "store --file=.git/credentials"
-                        echo "https://${GITHUB_TOKEN}@github.com" > .git/credentials
                         
                         # Pull latest feature_data.csv from DVC remote
-                        dvc pull feature_selection.csv.dvc
+                        dvc pull feature_selection.csv.dvc || echo "No DVC changes"
                         
                         # Run feature selection
                         python "Feature Selection/feature_selection.py"
@@ -130,18 +147,16 @@ pipeline {
                         git add feature_selection.csv.dvc .gitignore
                         git commit -m "Update feature selection output [CI]" || echo "No changes to commit"
                         git pull --rebase origin main || true
-                        git push origin HEAD:main || true
+                        git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
                         
                         # Push data to S3
                         dvc push
-                        
-                        # Clean up credentials file
-                        rm -f .git/credentials
                         '''
                     }
                 }
             }
         }
+
         // STAGE 4: Model Training and Serving
         stage('Model Training and Serving') {
             agent any
@@ -150,62 +165,65 @@ pipeline {
                 AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
                 AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')    
                 AWS_DEFAULT_REGION    = 'us-east-1'
-                GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
             steps {
-                sh '''
-                echo "[INFO] Activating Heavy virtual environment..."
-                . $VENV_HEAVY/bin/activate
-                # Git config
-                git config --global user.name "jenkins-bot"
-                git config --global user.email "jenkins@example.com"
+                script {
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                        echo "[INFO] Activating Heavy virtual environment..."
+                        . $VENV_HEAVY/bin/activate
+                        # Git config
+                        git config --local user.name "jenkins-bot"
+                        git config --local user.email "jenkins@example.com"
 
-                # Pull feature_selection.csv from S3 (via DVC)
-                dvc pull
+                        # Pull feature_selection.csv from S3 (via DVC)
+                        dvc pull
 
-                # Run AQI prediction script (generates predictions.csv)
-                python "Model Training/predict_next_3days.py"
+                        # Run AQI prediction script (generates predictions.csv)
+                        python "Model Training/predict_next_3days.py"
 
-                # Track predictions.csv with DVC
-                dvc add predictions.csv
+                        # Track predictions.csv with DVC
+                        dvc add predictions.csv
 
-                # Commit DVC metadata
-                git add predictions.csv.dvc .gitignore
-                git commit -m "Update predictions.csv via DVC [CI]" || echo "No changes to commit"
-                git pull --rebase origin main || true
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+                        # Commit DVC metadata
+                        git add predictions.csv.dvc .gitignore
+                        git commit -m "Update predictions.csv via DVC [CI]" || echo "No changes to commit"
+                        git pull --rebase origin main || true
+                        git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
 
-                # Push predictions.csv to S3 via DVC
-                dvc push
+                        # Push predictions.csv to S3 via DVC
+                        dvc push
 
-                # Get latest SARIMAX BentoML model tag
-                MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
-                echo "MODEL_TAG=${MODEL_TAG}"
-                
-                # Export model to .bentomodel archive
-                MODEL_HASH=${MODEL_TAG#*:}
-                EXPORT_BASE="sarimax_model_${MODEL_HASH}"
-                ACTUAL_FILENAME="${EXPORT_BASE}.bentomodel"
-                bentoml models export "$MODEL_TAG" "$EXPORT_BASE"
+                        # Get latest SARIMAX BentoML model tag
+                        MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
+                        echo "MODEL_TAG=${MODEL_TAG}"
+                        
+                        # Export model to .bentomodel archive
+                        MODEL_HASH=${MODEL_TAG#*:}
+                        EXPORT_BASE="sarimax_model_${MODEL_HASH}"
+                        ACTUAL_FILENAME="${EXPORT_BASE}.bentomodel"
+                        bentoml models export "$MODEL_TAG" "$EXPORT_BASE"
 
-                # Upload SARIMAX model to S3
-                aws s3 cp "$ACTUAL_FILENAME" "s3://s3-bucket-umairrr/models/"
+                        # Upload SARIMAX model to S3
+                        aws s3 cp "$ACTUAL_FILENAME" "s3://s3-bucket-umairrr/models/"
 
-                # Clean up older SARIMAX models (keep last 3)
-                files=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort)
-                total_files=$(echo "$files" | wc -l)
+                        # Clean up older SARIMAX models (keep last 3)
+                        files=$(aws s3 ls s3://s3-bucket-umairrr/models/ | grep sarimax_model_ | sort)
+                        total_files=$(echo "$files" | wc -l)
 
-                if [ "$total_files" -le 3 ]; then
-                    echo "Nothing to delete. Less than or equal to 3 models."
-                else
-                    to_delete=$(echo "$files" | head -n $(($total_files - 3)) | awk '{print $4}')
-                    for file in $to_delete; do
-                        echo "Deleting $file..."
-                        aws s3 rm "s3://s3-bucket-umairrr/models/$file"
-                    done
-                    echo "Cleanup complete."
-                fi
-                '''
+                        if [ "$total_files" -le 3 ]; then
+                            echo "Nothing to delete. Less than or equal to 3 models."
+                        else
+                            to_delete=$(echo "$files" | head -n $(($total_files - 3)) | awk '{print $4}')
+                            for file in $to_delete; do
+                                echo "Deleting $file..."
+                                aws s3 rm "s3://s3-bucket-umairrr/models/$file"
+                            done
+                            echo "Cleanup complete."
+                        fi
+                        '''
+                    }
+                }
             }
         }
 
@@ -217,7 +235,6 @@ pipeline {
                 AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
                 AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')   
                 AWS_DEFAULT_REGION    = 'us-east-1'
-                GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
 
              steps {
@@ -289,14 +306,18 @@ pipeline {
                     '''
                 }
                 success {
-                    sh '''
-                    echo "Committing updated forecast output to GitHub..."
-                    git config --global user.name "jenkins-bot"
-                    git config --global user.email "jenkins@example.com"
-                    git add bentoml_forecast_output.csv
-                    git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
-                    git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
-                    '''
+                    script {
+                        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                            sh '''
+                            echo "Committing updated forecast output to GitHub..."
+                            git config --local user.name "jenkins-bot"
+                            git config --local user.email "jenkins@example.com"
+                            git add bentoml_forecast_output.csv
+                            git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
+                            git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
+                            '''
+                        }
+                    }
                 }
             }
         }
