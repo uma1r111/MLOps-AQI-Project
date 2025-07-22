@@ -97,8 +97,8 @@ pipeline {
             agent any
             environment {
                 VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
-                AWS_ACCESS_KEY_ID     = credentials('aws-credentials')    // Jenkins Credentials (ID = aws-credentials)
-                AWS_SECRET_ACCESS_KEY = credentials('aws-credentials')    // Same ID used for both
+                AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
+                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')   
                 AWS_DEFAULT_REGION    = 'us-east-1'
                 GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
@@ -138,8 +138,8 @@ pipeline {
             agent any
             environment {
                 VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
-                AWS_ACCESS_KEY_ID     = credentials('aws-credentials')    // Jenkins Credentials (ID = aws-credentials)
-                AWS_SECRET_ACCESS_KEY = credentials('aws-credentials')    // Same ID used for both
+                AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
+                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')    
                 AWS_DEFAULT_REGION    = 'us-east-1'
                 GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
@@ -205,8 +205,8 @@ pipeline {
             agent any
             environment {
                 VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
-                AWS_ACCESS_KEY_ID     = credentials('aws-credentials')    // Jenkins Credentials (ID = aws-credentials)
-                AWS_SECRET_ACCESS_KEY = credentials('aws-credentials')    // Same ID used for both
+                AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
+                AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')   
                 AWS_DEFAULT_REGION    = 'us-east-1'
                 GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
             }
