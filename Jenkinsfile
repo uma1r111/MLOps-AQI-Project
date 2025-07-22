@@ -102,20 +102,21 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'aws-credentials', 
                                                 usernameVariable: 'AWS_ACCESS_KEY_ID', 
                                                 passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
+                    sh '''#!/bin/bash
+                    set -e
                     echo "[INFO] Activating Heavy virtual environment..."
-                    . $VENV_HEAVY/bin/activate
+                    source "${VENV_HEAVY}/bin/activate"
 
-                    # Debug AWS credentials
-                    echo "[DEBUG] AWS Access Key ID: ${AWS_ACCESS_KEY_ID:0:4}****"
+                    # Debug AWS credentials (safer approach)
+                    echo "[DEBUG] AWS Access Key ID: $(echo $AWS_ACCESS_KEY_ID | cut -c1-4)****"
                     echo "[DEBUG] AWS Region: $AWS_DEFAULT_REGION"
 
                     # Test AWS S3 connection
                     echo "[INFO] Testing AWS S3 connection..."
-                    aws s3 ls s3://s3-bucket-umairrr/ --region $AWS_DEFAULT_REGION || {
+                    if ! aws s3 ls s3://s3-bucket-umairrr/ --region "$AWS_DEFAULT_REGION"; then
                         echo "[ERROR] Failed to connect to S3. Please check AWS credentials and bucket permissions."
                         exit 1
-                    }
+                    fi
 
                     # Optional: re-authenticate git (in case Jenkins doesn't inherit global config)
                     git config --global user.name "jenkins-bot"
@@ -126,14 +127,14 @@ pipeline {
                         echo "[INFO] Initializing DVC..."
                         dvc init --no-scm
                         dvc remote add -d myremote s3://s3-bucket-umairrr/files
-                        dvc remote modify myremote region $AWS_DEFAULT_REGION
+                        dvc remote modify myremote region "$AWS_DEFAULT_REGION"
                     fi
 
                     # Pull latest feature_data.csv from DVC remote (fixed typo: dvc not dve)
                     echo "[INFO] Pulling feature selection data from DVC remote..."
-                    dvc pull feature_selection.csv.dvc || {
+                    if ! dvc pull feature_selection.csv.dvc; then
                         echo "[WARNING] Could not pull feature_selection.csv.dvc. File might not exist yet."
-                    }
+                    fi
 
                     # Run feature selection
                     echo "[INFO] Running feature selection..."
@@ -144,9 +145,14 @@ pipeline {
 
                     # Commit & push DVC metadata
                     git add feature_selection.csv.dvc .gitignore
-                    git commit -m "Update feature selection output [CI]" || echo "No changes to commit"
+                    if git commit -m "Update feature selection output [CI]"; then
+                        echo "Changes committed successfully"
+                    else
+                        echo "No changes to commit"
+                    fi
+                    
                     git pull --rebase origin main || true
-                    git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+                    git push "https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git" HEAD:main || true
 
                     # Push data to S3
                     echo "[INFO] Pushing data to S3 via DVC..."
@@ -167,9 +173,10 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'aws-credentials', 
                                                 usernameVariable: 'AWS_ACCESS_KEY_ID', 
                                                 passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
+                    sh '''#!/bin/bash
+                    set -e
                     echo "[INFO] Activating Heavy virtual environment..."
-                    . $VENV_HEAVY/bin/activate
+                    source "${VENV_HEAVY}/bin/activate"
                     
                     # Git config
                     git config --global user.name "jenkins-bot"
@@ -188,9 +195,14 @@ pipeline {
 
                     # Commit DVC metadata
                     git add predictions.csv.dvc .gitignore
-                    git commit -m "Update predictions.csv via DVC [CI]" || echo "No changes to commit"
+                    if git commit -m "Update predictions.csv via DVC [CI]"; then
+                        echo "Changes committed successfully"
+                    else
+                        echo "No changes to commit"
+                    fi
+                    
                     git pull --rebase origin main || true
-                    git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
+                    git push "https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git" HEAD:main || true
 
                     # Push predictions.csv to S3 via DVC
                     echo "[INFO] Pushing predictions to S3..."
@@ -205,8 +217,8 @@ pipeline {
                         exit 1
                     fi
                     
-                    # Export model to .bentomodel archive
-                    MODEL_HASH=${MODEL_TAG#*:}
+                    # Export model to .bentomodel archive (safer parameter expansion)
+                    MODEL_HASH=$(echo "$MODEL_TAG" | cut -d':' -f2)
                     EXPORT_BASE="sarimax_model_${MODEL_HASH}"
                     ACTUAL_FILENAME="${EXPORT_BASE}.bentomodel"
                     echo "[INFO] Exporting model to ${ACTUAL_FILENAME}..."
@@ -214,20 +226,24 @@ pipeline {
 
                     # Upload SARIMAX model to S3
                     echo "[INFO] Uploading model to S3..."
-                    aws s3 cp "$ACTUAL_FILENAME" "s3://s3-bucket-umairrr/models/" --region $AWS_DEFAULT_REGION
+                    aws s3 cp "$ACTUAL_FILENAME" "s3://s3-bucket-umairrr/models/" --region "$AWS_DEFAULT_REGION"
 
                     # Clean up older SARIMAX models (keep last 3)
                     echo "[INFO] Cleaning up old models..."
-                    files=$(aws s3 ls s3://s3-bucket-umairrr/models/ --region $AWS_DEFAULT_REGION | grep sarimax_model_ | sort)
+                    files=$(aws s3 ls s3://s3-bucket-umairrr/models/ --region "$AWS_DEFAULT_REGION" | grep sarimax_model_ | sort)
                     total_files=$(echo "$files" | wc -l)
 
                     if [ "$total_files" -le 3 ]; then
                         echo "Nothing to delete. Less than or equal to 3 models."
                     else
-                        to_delete=$(echo "$files" | head -n $(($total_files - 3)) | awk '{print $4}')
-                        for file in $to_delete; do
-                            echo "Deleting $file..."
-                            aws s3 rm "s3://s3-bucket-umairrr/models/$file" --region $AWS_DEFAULT_REGION
+                        # Use head and tail for safer arithmetic
+                        files_to_delete=$(echo "$files" | head -n -3)
+                        echo "$files_to_delete" | while read -r line; do
+                            if [ -n "$line" ]; then
+                                file=$(echo "$line" | awk '{print $4}')
+                                echo "Deleting $file..."
+                                aws s3 rm "s3://s3-bucket-umairrr/models/$file" --region "$AWS_DEFAULT_REGION"
+                            fi
                         done
                         echo "Cleanup complete."
                     fi
@@ -247,15 +263,16 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'aws-credentials', 
                                                 usernameVariable: 'AWS_ACCESS_KEY_ID', 
                                                 passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
+                    sh '''#!/bin/bash
+                    set -e
                     echo "[INFO] Activating Heavy virtual environment..."
-                    . $VENV_HEAVY/bin/activate
+                    source "${VENV_HEAVY}/bin/activate"
                     
                     echo "Pulling feature_selection.csv from S3 via DVC..."
                     dvc pull feature_selection.csv.dvc
                     
                     echo "Getting latest SARIMAX model from S3..."
-                    LATEST_MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ --region $AWS_DEFAULT_REGION | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
+                    LATEST_MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ --region "$AWS_DEFAULT_REGION" | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
                     echo "Latest model: $LATEST_MODEL"
                     
                     if [ -z "$LATEST_MODEL" ]; then
@@ -264,7 +281,7 @@ pipeline {
                     fi
                     
                     echo "Downloading $LATEST_MODEL..."
-                    aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./ --region $AWS_DEFAULT_REGION
+                    aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./ --region "$AWS_DEFAULT_REGION"
                     
                     echo "Importing BentoML model: $LATEST_MODEL"
                     bentoml models import "$LATEST_MODEL"
@@ -280,7 +297,7 @@ pipeline {
                     nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
                     
                     echo "Waiting for BentoML service to start..."
-                    for i in {1..30}; do
+                    for i in $(seq 1 30); do
                         if curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
                             echo "BentoML service is running"
                             break
@@ -309,20 +326,24 @@ pipeline {
             }
             post {
                 always {
-                    sh '''
+                    sh '''#!/bin/bash
                     echo "Stopping BentoML service..."
                     pkill -f "bentoml serve" || true
                     echo "Service stopped"
                     '''
                 }
                 success {
-                    sh '''
+                    sh '''#!/bin/bash
                     echo "Committing updated forecast output to GitHub..."
                     git config --global user.name "jenkins-bot"
                     git config --global user.email "jenkins@example.com"
                     git add bentoml_forecast_output.csv
-                    git commit -m "Update bentoml_forecast_output.csv [CI]" || echo "No changes to commit"
-                    git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main
+                    if git commit -m "Update bentoml_forecast_output.csv [CI]"; then
+                        echo "Changes committed successfully"
+                    else
+                        echo "No changes to commit"
+                    fi
+                    git push "https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git" HEAD:main
                     '''
                 }
             }
