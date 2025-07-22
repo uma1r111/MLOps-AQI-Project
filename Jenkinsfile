@@ -100,40 +100,48 @@ pipeline {
                 AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')    
                 AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-keys')   
                 AWS_DEFAULT_REGION    = 'us-east-1'
-                GITHUB_PAT            = credentials('github-token')       // Jenkins Credentials (ID = github-token)
+                GITHUB_PAT            = credentials('github-token')
             }
-
             steps {
-                sh '''
-                set -x  # Echo each command
-                echo "[INFO] Activating Heavy virtual environment..."
-                . $VENV_HEAVY/bin/activate
-
-                # Optional: re-authenticate git (in case Jenkins doesnt inherit global config)
-                git config --global user.name "jenkins-bot"
-                git config --global user.email "jenkins@example.com"
-
-                # Pull latest feature_data.csv from DVC remote
-                dvc pull feature_selection.csv.dvc
-
-                # Run feature selection
-                python "Feature Selection/feature_selection.py"
-
-                # Track the new/updated output
-                dvc add feature_selection.csv
-
-                # Commit & push DVC metadata
-                git add feature_selection.csv.dvc .gitignore
-                git commit -m "Update feature selection output [CI]" || echo "No changes to commit"
-                git pull --rebase origin main || true
-                git push https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
-
-                # Push data to S3
-                dvc push
-            '''
+                script {
+                    // Use Jenkins Git plugin's withCredentials for proper authentication
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                        set -x  # Echo each command
+                        echo "[INFO] Activating Heavy virtual environment..."
+                        . $VENV_HEAVY/bin/activate
+                        
+                        # Configure git with credentials
+                        git config --local user.name "jenkins-bot"
+                        git config --local user.email "jenkins@example.com"
+                        git config --local credential.helper "store --file=.git/credentials"
+                        echo "https://${GITHUB_TOKEN}@github.com" > .git/credentials
+                        
+                        # Pull latest feature_data.csv from DVC remote
+                        dvc pull feature_selection.csv.dvc
+                        
+                        # Run feature selection
+                        python "Feature Selection/feature_selection.py"
+                        
+                        # Track the new/updated output
+                        dvc add feature_selection.csv
+                        
+                        # Commit & push DVC metadata
+                        git add feature_selection.csv.dvc .gitignore
+                        git commit -m "Update feature selection output [CI]" || echo "No changes to commit"
+                        git pull --rebase origin main || true
+                        git push origin HEAD:main || true
+                        
+                        # Push data to S3
+                        dvc push
+                        
+                        # Clean up credentials file
+                        rm -f .git/credentials
+                        '''
+                    }
+                }
             }
         }
-
         // STAGE 4: Model Training and Serving
         stage('Model Training and Serving') {
             agent any
