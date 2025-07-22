@@ -1,23 +1,37 @@
 pipeline {
     agent none
 
+    // Skip Jenkins' automatic checkout
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
         GITHUB_PAT = credentials('github-token') // GitHub PAT for pushing files
     }
 
     stages {
-        // Add explicit checkout stage with credentials
+        // Manual checkout with credentials
         stage('Checkout') {
             agent any
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/uma1r111/10pearls-AQI-Project-.git',
-                        credentialsId: 'github-token'
-                    ]]
-                ])
+                script {
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                        echo "Cloning repository with credentials..."
+                        if [ -d ".git" ]; then
+                            echo "Repository already exists, pulling latest..."
+                            git fetch origin
+                            git reset --hard origin/main
+                        else
+                            echo "Cloning repository..."
+                            git clone https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git .
+                        fi
+                        git config --local user.name "jenkins-bot"
+                        git config --local user.email "jenkins@example.com"
+                        '''
+                    }
+                }
             }
         }
 
@@ -75,7 +89,7 @@ pipeline {
                         git config --local user.email "jenkins@example.com"
                         git add karachi_weather_apr1_to_current.csv
                         git commit -m "Daily update: AQI + Weather data" || echo "No changes to commit"
-                        git pull --rebase origin main || true
+                        git pull --rebase https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git main || true
                         git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
                         '''
                     }
@@ -105,7 +119,7 @@ pipeline {
                         git config --local user.email "jenkins@example.com"
                         git add full_preprocessed_aqi_weather_data_with_all_features.csv
                         git commit -m "Daily update: Feature engineered AQI + weather data" || echo "No changes to commit"
-                        git pull --rebase origin main || true
+                        git pull --rebase https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git main || true
                         git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
                         '''
                     }
@@ -146,7 +160,7 @@ pipeline {
                         # Commit & push DVC metadata
                         git add feature_selection.csv.dvc .gitignore
                         git commit -m "Update feature selection output [CI]" || echo "No changes to commit"
-                        git pull --rebase origin main || true
+                        git pull --rebase https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git main || true
                         git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
                         
                         # Push data to S3
@@ -188,7 +202,7 @@ pipeline {
                         # Commit DVC metadata
                         git add predictions.csv.dvc .gitignore
                         git commit -m "Update predictions.csv via DVC [CI]" || echo "No changes to commit"
-                        git pull --rebase origin main || true
+                        git pull --rebase https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git main || true
                         git push https://${GITHUB_TOKEN}@github.com/uma1r111/10pearls-AQI-Project-.git HEAD:main || true
 
                         # Push predictions.csv to S3 via DVC
