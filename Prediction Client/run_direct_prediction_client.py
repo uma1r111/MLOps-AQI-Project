@@ -1,19 +1,39 @@
 import os
 import pandas as pd
 import numpy as np
-import pickle
+import bentoml
 import subprocess
 from datetime import datetime, timedelta
+import json
 
-def load_model(model_path):
-    """Load the SARIMAX model from pickle file"""
+def get_latest_model():
+    """Get the latest SARIMAX model from BentoML store"""
     try:
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
-        print(f"Model loaded successfully from {model_path}")
+        # Run bentoml models list command
+        result = subprocess.run(
+            ["bentoml", "models", "list", "--output=json"], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        
+        models = json.loads(result.stdout)
+        sarimax_models = [m for m in models if m['tag'].startswith('sarimax_model:')]
+        
+        if not sarimax_models:
+            raise ValueError("No SARIMAX models found in BentoML store")
+        
+        # Get the latest model (sort by tag)
+        latest_model = sorted(sarimax_models, key=lambda x: x['tag'])[-1]
+        model_tag = latest_model['tag']
+        
+        print(f"Loading model: {model_tag}")
+        model = bentoml.models.get(model_tag)
+        
         return model
+        
     except Exception as e:
-        print(f"Error loading model: {e}")
+        print(f"Error loading model from BentoML store: {e}")
         exit(1)
 
 # -----------------------------
@@ -28,15 +48,18 @@ def load_model(model_path):
 #     exit(1)
 
 # -----------------------------
-# Step 2: Load model
+# Step 2: Load model from BentoML store
 # -----------------------------
-print("\nLoading SARIMAX model...")
-model_path = 'latest_model.pkl'
-if not os.path.exists(model_path):
-    print(f"Error: Model file {model_path} not found")
-    exit(1)
+print("\nLoading SARIMAX model from BentoML store...")
+model_ref = get_latest_model()
 
-model = load_model(model_path)
+# Load the actual model object
+try:
+    model = model_ref.load_model()
+    print("Model loaded successfully from BentoML store")
+except Exception as e:
+    print(f"Error loading model object: {e}")
+    exit(1)
 
 # -----------------------------
 # Step 3: Load and prepare input data
