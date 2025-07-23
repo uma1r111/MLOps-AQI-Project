@@ -28,7 +28,8 @@ def get_latest_model():
         model_tag = latest_model['tag']
         
         print(f"Loading model: {model_tag}")
-        model = bentoml.models.get(model_tag)
+        model_ref = bentoml.models.get(model_tag)
+        model = model_ref.load_model()
         
         return model
         
@@ -51,15 +52,7 @@ def get_latest_model():
 # Step 2: Load model from BentoML store
 # -----------------------------
 print("\nLoading SARIMAX model from BentoML store...")
-model_ref = get_latest_model()
-
-# Load the actual model object
-try:
-    model = model_ref.load_model()
-    print("Model loaded successfully from BentoML store")
-except Exception as e:
-    print(f"Error loading model object: {e}")
-    exit(1)
+model = get_latest_model()
 
 # -----------------------------
 # Step 3: Load and prepare input data
