@@ -1,0 +1,115 @@
+import os
+import pandas as pd
+import numpy as np
+import pickle
+import subprocess
+from datetime import datetime, timedelta
+
+def load_model(model_path):
+    """Load the SARIMAX model from pickle file"""
+    try:
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        print(f"Model loaded successfully from {model_path}")
+        return model
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        exit(1)
+
+# -----------------------------
+# Step 1: Pull latest feature_selection.csv via DVC (commented out as it's done in Jenkins stage)
+# -----------------------------
+# print("\nPulling latest feature_selection.csv from DVC remote (S3)...")
+# try:
+#     subprocess.run(["dvc", "pull", "feature_selection.csv.dvc"], check=True)
+#     print("Pulled feature_selection.csv successfully.")
+# except subprocess.CalledProcessError as e:
+#     print("Failed to pull feature_selection.csv:", e)
+#     exit(1)
+
+# -----------------------------
+# Step 2: Load model
+# -----------------------------
+print("\nLoading SARIMAX model...")
+model_path = 'latest_model.pkl'
+if not os.path.exists(model_path):
+    print(f"Error: Model file {model_path} not found")
+    exit(1)
+
+model = load_model(model_path)
+
+# -----------------------------
+# Step 3: Load and prepare input data
+# -----------------------------
+print("\nLoading and preparing input data...")
+try:
+    df = pd.read_csv("feature_selection.csv")
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df = df.sort_values("datetime")
+
+    # Select exogenous features only
+    exog_features = df.drop(columns=["datetime", "aqi_us"])
+
+    # Get last 72 rows for exogenous data
+    last_72_exog = exog_features.tail(72)
+
+    if len(last_72_exog) < 72:
+        raise ValueError("Insufficient data: Need at least 72 rows of exogenous features.")
+
+    # Get the last timestamp
+    last_timestamp = df["datetime"].iloc[-1]
+
+    print(f"Prepared {len(last_72_exog)} rows of exogenous input data.")
+    print(f"Last timestamp: {last_timestamp}")
+
+except Exception as e:
+    print("Error while preparing input data:", e)
+    exit(1)
+
+# -----------------------------
+# Step 4: Make direct predictions using loaded model
+# -----------------------------
+print("\nMaking predictions with loaded model...")
+try:
+    # Make 72-step forecast
+    forecast_steps = 72
+    forecast = model.forecast(steps=forecast_steps, exog=last_72_exog)
+    
+    # Create forecast timestamps
+    forecast_timestamps = pd.date_range(
+        start=last_timestamp + timedelta(hours=1),
+        periods=forecast_steps,
+        freq='H'
+    )
+    
+    # Format forecast dates as strings
+    forecast_dates = [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in forecast_timestamps]
+    
+    print("Prediction successful.\n")
+
+    # Create results similar to BentoML output
+    result = {
+        "forecast": forecast.tolist(),
+        "forecast_dates": forecast_dates
+    }
+
+    # Save to CSV
+    pred_df = pd.DataFrame({
+        "datetime": result["forecast_dates"],
+        "predicted_aqi_us": result["forecast"]
+    })
+    pred_df.to_csv("direct_forecast_output.csv", index=False)
+    print("Saved predictions to direct_forecast_output.csv")
+
+    # Print summary
+    print(f"Average AQI: {np.mean(result['forecast']):.2f}")
+    print(f"Min AQI: {np.min(result['forecast']):.2f}")
+    print(f"Max AQI: {np.max(result['forecast']):.2f}")
+    print(f"Forecast periods: {len(result['forecast'])}")
+    print(f"Time range: {result['forecast_dates'][0]} to {result['forecast_dates'][-1]}")
+
+except Exception as e:
+    print("Error making predictions:", e)
+    exit(1)
+
+print("\nDirect prediction completed successfully!")
