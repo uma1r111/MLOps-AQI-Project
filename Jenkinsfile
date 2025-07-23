@@ -32,7 +32,7 @@ pipeline {
                     python3 -m venv $VENV_HEAVY
                     . $VENV_HEAVY/bin/activate
                     pip install --upgrade pip
-                    pip install dvc[s3] boto3 s3fs pandas numpy scikit-learn statsmodels bentoml==1.2.0 awscli
+                    pip install dvc[s3] boto3 pickle5 s3fs pandas numpy scikit-learn statsmodels bentoml==1.2.0 awscli
                 else
                     echo "[INFO] Heavy env already exists."
                     # Ensure awscli is installed in existing environment
