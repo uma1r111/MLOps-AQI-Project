@@ -276,124 +276,124 @@ pipeline {
             }
         }
 
-        // STAGE 5: BentoML Forecast & Push Output
-        stage('BentoML Forecast') {
-            agent any
-            environment {
-                VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
-                AWS_DEFAULT_REGION = 'us-east-1'
-            }
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-credentials', 
-                                                usernameVariable: 'AWS_ACCESS_KEY_ID', 
-                                                passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''#!/bin/bash
-                    set -e
-                    echo "[INFO] Activating Heavy virtual environment..."
-                    source "${VENV_HEAVY}/bin/activate"
+        // // STAGE 5: BentoML Forecast & Push Output
+        // stage('BentoML Forecast') {
+        //     agent any
+        //     environment {
+        //         VENV_HEAVY = "${HOME}/.venv-aqi-heavy"
+        //         AWS_DEFAULT_REGION = 'us-east-1'
+        //     }
+        //     steps {
+        //         withCredentials([usernamePassword(credentialsId: 'aws-credentials', 
+        //                                         usernameVariable: 'AWS_ACCESS_KEY_ID', 
+        //                                         passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        //             sh '''#!/bin/bash
+        //             set -e
+        //             echo "[INFO] Activating Heavy virtual environment..."
+        //             source "${VENV_HEAVY}/bin/activate"
                     
-                    # Export AWS credentials for this session
-                    export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
-                    export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
-                    export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
+        //             # Export AWS credentials for this session
+        //             export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+        //             export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+        //             export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
 
-                    # Ensure AWS CLI is available
-                    if ! command -v aws &> /dev/null; then
-                        echo "[INFO] Installing AWS CLI in virtual environment..."
-                        pip install awscli
-                    fi
+        //             # Ensure AWS CLI is available
+        //             if ! command -v aws &> /dev/null; then
+        //                 echo "[INFO] Installing AWS CLI in virtual environment..."
+        //                 pip install awscli
+        //             fi
                     
-                    echo "Pulling feature_selection.csv from S3 via DVC..."
-                    dvc pull feature_selection.csv.dvc
+        //             echo "Pulling feature_selection.csv from S3 via DVC..."
+        //             dvc pull feature_selection.csv.dvc
                     
-                    echo "Getting latest SARIMAX model from S3..."
-                    LATEST_MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ --region "$AWS_DEFAULT_REGION" | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
-                    echo "Latest model: $LATEST_MODEL"
+        //             echo "Getting latest SARIMAX model from S3..."
+        //             LATEST_MODEL=$(aws s3 ls s3://s3-bucket-umairrr/models/ --region "$AWS_DEFAULT_REGION" | grep sarimax_model_ | sort | tail -n1 | awk '{print $4}')
+        //             echo "Latest model: $LATEST_MODEL"
                     
-                    if [ -z "$LATEST_MODEL" ]; then
-                        echo "No SARIMAX model found in S3"
-                        exit 1
-                    fi
+        //             if [ -z "$LATEST_MODEL" ]; then
+        //                 echo "No SARIMAX model found in S3"
+        //                 exit 1
+        //             fi
                     
-                    # Extract model hash from filename for checking if already exists
-                    MODEL_HASH=$(echo "$LATEST_MODEL" | sed 's/sarimax_model_\\(.*\\)\\.bentomodel/\\1/')
-                    MODEL_TAG="sarimax_model:$MODEL_HASH"
-                    echo "Expected model tag: $MODEL_TAG"
+        //             # Extract model hash from filename for checking if already exists
+        //             MODEL_HASH=$(echo "$LATEST_MODEL" | sed 's/sarimax_model_\\(.*\\)\\.bentomodel/\\1/')
+        //             MODEL_TAG="sarimax_model:$MODEL_HASH"
+        //             echo "Expected model tag: $MODEL_TAG"
                     
-                    # Check if model already exists in BentoML store
-                    if bentoml models list --output=json | jq -e ".[] | select(.tag == \\"$MODEL_TAG\\")" > /dev/null; then
-                        echo "Model $MODEL_TAG already exists in BentoML store, skipping import"
-                    else
-                        echo "Downloading $LATEST_MODEL..."
-                        aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./ --region "$AWS_DEFAULT_REGION"
+        //             # Check if model already exists in BentoML store
+        //             if bentoml models list --output=json | jq -e ".[] | select(.tag == \\"$MODEL_TAG\\")" > /dev/null; then
+        //                 echo "Model $MODEL_TAG already exists in BentoML store, skipping import"
+        //             else
+        //                 echo "Downloading $LATEST_MODEL..."
+        //                 aws s3 cp "s3://s3-bucket-umairrr/models/$LATEST_MODEL" ./ --region "$AWS_DEFAULT_REGION"
                         
-                        echo "Importing BentoML model: $LATEST_MODEL"
-                        bentoml models import "$LATEST_MODEL"
-                        echo "Model imported successfully"
-                    fi
+        //                 echo "Importing BentoML model: $LATEST_MODEL"
+        //                 bentoml models import "$LATEST_MODEL"
+        //                 echo "Model imported successfully"
+        //             fi
                     
-                    # Get the actual model tag (whether imported or already existed)
-                    ACTUAL_MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
-                    echo "Using model tag: $ACTUAL_MODEL_TAG"
+        //             # Get the actual model tag (whether imported or already existed)
+        //             ACTUAL_MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
+        //             echo "Using model tag: $ACTUAL_MODEL_TAG"
                     
-                    echo "Copying service file..."
-                    cp "Model Serving/service.py" ./service.py
-                    echo "Copied service.py from Model Serving folder"
+        //             echo "Copying service file..."
+        //             cp "Model Serving/service.py" ./service.py
+        //             echo "Copied service.py from Model Serving folder"
                     
-                    echo "Starting BentoML service with model: $ACTUAL_MODEL_TAG"
-                    nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
+        //             echo "Starting BentoML service with model: $ACTUAL_MODEL_TAG"
+        //             nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
                     
-                    echo "Waiting for BentoML service to start..."
-                    for i in $(seq 1 30); do
-                        if curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
-                            echo "BentoML service is running"
-                            break
-                        fi
-                        echo "Attempt $i: Service not ready yet, waiting..."
-                        sleep 3
-                    done
+        //             echo "Waiting for BentoML service to start..."
+        //             for i in $(seq 1 30); do
+        //                 if curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
+        //                     echo "BentoML service is running"
+        //                     break
+        //                 fi
+        //                 echo "Attempt $i: Service not ready yet, waiting..."
+        //                 sleep 3
+        //             done
                     
-                    # Check if service is actually running
-                    if ! curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
-                        echo "BentoML service failed to start"
-                        echo "Service logs:"
-                        cat bentoml_service.log || echo "No log file found"
-                        echo "Process list:"
-                        ps aux | grep bentoml || true
-                        exit 1
-                    fi
+        //             # Check if service is actually running
+        //             if ! curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
+        //                 echo "BentoML service failed to start"
+        //                 echo "Service logs:"
+        //                 cat bentoml_service.log || echo "No log file found"
+        //                 echo "Process list:"
+        //                 ps aux | grep bentoml || true
+        //                 exit 1
+        //             fi
                     
-                    echo "Testing service..."
-                    curl -X POST http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}'
+        //             echo "Testing service..."
+        //             curl -X POST http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}'
                     
-                    echo "Running BentoML prediction client..."
-                    python "Prediction Client/run_prediction_client.py"
-                    '''
-                }
-            }
-            post {
-                always {
-                    sh '''#!/bin/bash
-                    echo "Stopping BentoML service..."
-                    pkill -f "bentoml serve" || true
-                    echo "Service stopped"
-                    '''
-                }
-                success {
-                    sh '''#!/bin/bash
-                    echo "Committing updated forecast output to GitHub..."
-                    git config --global user.name "jenkins-bot"
-                    git config --global user.email "jenkins@example.com"
-                    git add bentoml_forecast_output.csv
-                    if git commit -m "Update bentoml_forecast_output.csv [CI]"; then
-                        echo "Changes committed successfully"
-                    else
-                        echo "No changes to commit"
-                    fi
-                    git push "https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git" HEAD:main
-                    '''
-                }
-            }
-        }
+        //             echo "Running BentoML prediction client..."
+        //             python "Prediction Client/run_prediction_client.py"
+        //             '''
+        //         }
+        //     }
+        //     post {
+        //         always {
+        //             sh '''#!/bin/bash
+        //             echo "Stopping BentoML service..."
+        //             pkill -f "bentoml serve" || true
+        //             echo "Service stopped"
+        //             '''
+        //         }
+        //         success {
+        //             sh '''#!/bin/bash
+        //             echo "Committing updated forecast output to GitHub..."
+        //             git config --global user.name "jenkins-bot"
+        //             git config --global user.email "jenkins@example.com"
+        //             git add bentoml_forecast_output.csv
+        //             if git commit -m "Update bentoml_forecast_output.csv [CI]"; then
+        //                 echo "Changes committed successfully"
+        //             else
+        //                 echo "No changes to commit"
+        //             fi
+        //             git push "https://${GITHUB_PAT}@github.com/uma1r111/10pearls-AQI-Project-.git" HEAD:main
+        //             '''
+        //         }
+        //     }
+        // }
     }
 }
