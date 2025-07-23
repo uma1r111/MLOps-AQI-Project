@@ -37,16 +37,57 @@ def get_latest_model():
         print(f"Error loading model from BentoML store: {e}")
         exit(1)
 
+def import_model_if_needed(model_file):
+    """Import model only if it doesn't already exist in the store"""
+    try:
+        # Extract model tag from filename (assuming format: sarimax_model_YYYYMMDD_HHMMSS.bentomodel)
+        base_name = os.path.splitext(model_file)[0]  # Remove .bentomodel extension
+        expected_tag = base_name  # This should be like "sarimax_model_20241205_143022"
+        
+        # Check if model already exists
+        result = subprocess.run(
+            ["bentoml", "models", "list", "--output=json"], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        
+        models = json.loads(result.stdout)
+        existing_tags = [m['tag'] for m in models]
+        
+        # Check if any existing tag starts with our expected tag (to handle version suffixes)
+        model_exists = any(tag.startswith(expected_tag + ":") for tag in existing_tags)
+        
+        if model_exists:
+            print(f"Model {expected_tag} already exists in BentoML store, skipping import")
+            return True
+        else:
+            print(f"Importing new model: {model_file}")
+            subprocess.run(["bentoml", "models", "import", model_file], check=True)
+            print(f"Successfully imported model: {model_file}")
+            return True
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error importing model: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error during model import: {e}")
+        return False
+
 # -----------------------------
-# Step 1: Pull latest feature_selection.csv via DVC (commented out as it's done in Jenkins stage)
+# Step 1: Import model if needed (called from Jenkins)
 # -----------------------------
-# print("\nPulling latest feature_selection.csv from DVC remote (S3)...")
-# try:
-#     subprocess.run(["dvc", "pull", "feature_selection.csv.dvc"], check=True)
-#     print("Pulled feature_selection.csv successfully.")
-# except subprocess.CalledProcessError as e:
-#     print("Failed to pull feature_selection.csv:", e)
-#     exit(1)
+# Check if we need to import a model (look for .bentomodel files)
+bentomodel_files = [f for f in os.listdir('.') if f.endswith('.bentomodel')]
+if bentomodel_files:
+    print(f"\nFound BentoModel file(s): {bentomodel_files}")
+    # Import the first (and presumably only) bentomodel file
+    model_file = bentomodel_files[0]
+    if not import_model_if_needed(model_file):
+        print("Failed to import model")
+        exit(1)
+else:
+    print("\nNo .bentomodel files found in current directory")
 
 # -----------------------------
 # Step 2: Load model from BentoML store

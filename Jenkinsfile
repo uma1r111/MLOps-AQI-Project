@@ -320,14 +320,7 @@ pipeline {
                     
                     echo "Model downloaded successfully as $LATEST_MODEL"
                     
-                    # Import the BentoML model to get access to it
-                    echo "Importing BentoML model..."
-                    bentoml models import "$LATEST_MODEL"
-                    
-                    # Get the imported model tag
-                    MODEL_TAG=$(bentoml models list --output=json | jq -r '.[] | select(.tag | startswith("sarimax_model:")) | .tag' | sort | tail -n1)
-                    echo "Imported model tag: $MODEL_TAG"
-                    
+                    # The Python script will handle model import (only if needed)
                     echo "Running direct prediction client..."
                     python "Prediction Client/run_direct_prediction_client.py"
                     '''
