@@ -38,38 +38,30 @@ def get_latest_model():
         exit(1)
 
 def import_model_if_needed(model_file):
-    """Import model only if it doesn't already exist in the store"""
+    """Import model, handling the case where it already exists"""
     try:
-        # Extract model tag from filename (assuming format: sarimax_model_YYYYMMDD_HHMMSS.bentomodel)
-        base_name = os.path.splitext(model_file)[0]  # Remove .bentomodel extension
-        expected_tag = base_name  # This should be like "sarimax_model_20241205_143022"
-        
-        # Check if model already exists
-        result = subprocess.run(
-            ["bentoml", "models", "list", "--output=json"], 
+        print(f"Attempting to import model: {model_file}")
+        import_result = subprocess.run(
+            ["bentoml", "models", "import", model_file], 
             capture_output=True, 
-            text=True, 
-            check=True
+            text=True,
+            check=False  # Don't raise exception on non-zero exit
         )
         
-        models = json.loads(result.stdout)
-        existing_tags = [m['tag'] for m in models]
-        
-        # Check if any existing tag starts with our expected tag (to handle version suffixes)
-        model_exists = any(tag.startswith(expected_tag + ":") for tag in existing_tags)
-        
-        if model_exists:
-            print(f"Model {expected_tag} already exists in BentoML store, skipping import")
+        if import_result.returncode == 0:
+            print(f"Successfully imported model: {model_file}")
+            print(f"Import output: {import_result.stdout}")
             return True
         else:
-            print(f"Importing new model: {model_file}")
-            subprocess.run(["bentoml", "models", "import", model_file], check=True)
-            print(f"Successfully imported model: {model_file}")
-            return True
-            
-    except subprocess.CalledProcessError as e:
-        print(f"Error importing model: {e}")
-        return False
+            # Check if the error is due to model already existing
+            error_output = import_result.stderr.lower()
+            if "already exist" in error_output or "already exists" in error_output:
+                print(f"Model already exists in BentoML store - this is fine, continuing...")
+                return True
+            else:
+                print(f"Import failed with error: {import_result.stderr}")
+                return False
+                
     except Exception as e:
         print(f"Unexpected error during model import: {e}")
         return False
@@ -83,11 +75,30 @@ if bentomodel_files:
     print(f"\nFound BentoModel file(s): {bentomodel_files}")
     # Import the first (and presumably only) bentomodel file
     model_file = bentomodel_files[0]
-    if not import_model_if_needed(model_file):
-        print("Failed to import model")
-        exit(1)
+    import_model_if_needed(model_file)  # Always attempt, handle gracefully
 else:
     print("\nNo .bentomodel files found in current directory")
+
+# Verify we have SARIMAX models available
+try:
+    result = subprocess.run(
+        ["bentoml", "models", "list", "--output=json"], 
+        capture_output=True, 
+        text=True, 
+        check=True
+    )
+    models = json.loads(result.stdout)
+    sarimax_models = [m for m in models if m['tag'].startswith('sarimax_model:')]
+    
+    if not sarimax_models:
+        print("ERROR: No SARIMAX models found in BentoML store")
+        exit(1)
+    else:
+        print(f"Found {len(sarimax_models)} SARIMAX models in store")
+        
+except Exception as e:
+    print(f"Failed to check BentoML models: {e}")
+    exit(1)
 
 # -----------------------------
 # Step 2: Load model from BentoML store
