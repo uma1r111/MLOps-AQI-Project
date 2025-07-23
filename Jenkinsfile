@@ -32,7 +32,7 @@ pipeline {
                     python3 -m venv $VENV_HEAVY
                     . $VENV_HEAVY/bin/activate
                     pip install --upgrade pip
-                    pip install dvc[s3] boto3 s3fs pandas numpy scikit-learn statsmodels bentoml awscli
+                    pip install dvc[s3] boto3 s3fs pandas numpy scikit-learn statsmodels bentoml==1.2.0 awscli
                 else
                     echo "[INFO] Heavy env already exists."
                     # Ensure awscli is installed in existing environment
@@ -341,11 +341,11 @@ pipeline {
                     echo "Copied service.py from Model Serving folder"
                     
                     echo "Starting BentoML service with model: $ACTUAL_MODEL_TAG"
-                    nohup bentoml serve service.py:svc --port 3000 --host 0.0.0.0 > bentoml_service.log 2>&1 &
+                    nohup bentoml serve service.py:svc --port 8090 --host 0.0.0.0 > bentoml_service.log 2>&1 &
                     
                     echo "Waiting for BentoML service to start..."
                     for i in $(seq 1 30); do
-                        if curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
+                        if curl -s http://172.174.154.85:8090/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
                             echo "BentoML service is running"
                             break
                         fi
@@ -354,7 +354,7 @@ pipeline {
                     done
                     
                     # Check if service is actually running
-                    if ! curl -s http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
+                    if ! curl -s http://172.174.154.85:8090/health_check -H "Content-Type: application/json" -d '{}' >/dev/null 2>&1; then
                         echo "BentoML service failed to start"
                         echo "Service logs:"
                         cat bentoml_service.log || echo "No log file found"
@@ -364,7 +364,7 @@ pipeline {
                     fi
                     
                     echo "Testing service..."
-                    curl -X POST http://localhost:3000/health_check -H "Content-Type: application/json" -d '{}'
+                    curl -X POST http://172.174.154.85:8090/health_check -H "Content-Type: application/json" -d '{}'
                     
                     echo "Running BentoML prediction client..."
                     python "Prediction Client/run_prediction_client.py"
