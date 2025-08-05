@@ -4,9 +4,6 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 from datetime import timedelta
 import os
 import bentoml
-import mlflow
-from mlflow.tracking import MlflowClient
-from datetime import datetime
 
 # ----------------------
 # Step 2: Load and Filter Data (matching training code)
