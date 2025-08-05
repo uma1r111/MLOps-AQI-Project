@@ -143,6 +143,10 @@ if models_results:
             'aic': best_model_info['aic']
         })
 
+        mlflow.set_tag("stage", "daily_training")
+        mlflow.set_tag("model_type", "SARIMAX")
+
+
         # Optional: log the model file as artifact
         import joblib
         model_file = "sarimax_model.pkl"
@@ -150,7 +154,6 @@ if models_results:
         mlflow.log_artifact(model_file)
 
         print("✅ Best model logged to MLflow successfully.")
-
         
     # Retrain best model on full dataset for final predictions
     print(f"\n Retraining best model on full dataset...")
