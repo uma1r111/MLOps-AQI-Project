@@ -5,11 +5,17 @@ from datetime import timedelta
 import os
 import bentoml
 import mlflow
+from mlflow.tracking import MlflowClient
 from datetime import datetime
 
-# Set experiment (creates if doesn't exist)
-mlflow.set_experiment("AQI Model Logging") 
+# MLflow Configuration
+# -------------------------------
+MLFLOW_TRACKING_URI = "http://localhost:8000"
+EXPERIMENT_NAME = "AQI Model Logging"
 
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_experiment(EXPERIMENT_NAME)
+client = MlflowClient()
 # ----------------------
 # Step 2: Load and Filter Data (matching training code)
 # ----------------------
@@ -124,7 +130,7 @@ if models_results:
     print(f"   MAE: {best_model_info['mae']:.4f}")
     print(f"   AIC: {best_model_info['aic']:.4f}")
 
-        # Start MLflow run
+    # Start MLflow run
     run_date = datetime.today().strftime("%Y-%m-%d")
     with mlflow.start_run(run_name=f"SARIMAX Run {run_date}"):
         # Log parameters
