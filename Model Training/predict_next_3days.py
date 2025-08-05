@@ -10,7 +10,7 @@ from datetime import datetime
 
 # MLflow Configuration
 # -------------------------------
-MLFLOW_TRACKING_URI = "http://172.174.154.85:8000/"
+MLFLOW_TRACKING_URI = "http://172.174.154.85:8000"
 EXPERIMENT_NAME = "AQI Model Logging"
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
