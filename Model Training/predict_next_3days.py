@@ -10,7 +10,7 @@ from datetime import datetime
 
 # MLflow Configuration
 # -------------------------------
-MLFLOW_TRACKING_URI = "http://localhost:8000"
+MLFLOW_TRACKING_URI = "http://172.174.154.85:8000/"
 EXPERIMENT_NAME = "AQI Model Logging"
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -136,16 +136,15 @@ if models_results:
         # Log parameters
         mlflow.log_params(best_model_info['params'])
 
+        mlflow.set_tag("stage", "daily_training")
+        mlflow.set_tag("model_type", "SARIMAX")
+
         # Log metrics
         mlflow.log_metrics({
             'rmse': best_model_info['rmse'],
             'mae': best_model_info['mae'],
             'aic': best_model_info['aic']
         })
-
-        mlflow.set_tag("stage", "daily_training")
-        mlflow.set_tag("model_type", "SARIMAX")
-
 
         # Optional: log the model file as artifact
         import joblib
