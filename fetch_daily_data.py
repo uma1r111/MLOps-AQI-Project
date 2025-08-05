@@ -94,9 +94,9 @@ if os.path.exists(csv_file):
         raise e
 
     # Backup original
-    backup_file = csv_file.replace(".csv", "_backup.csv")
-    shutil.copy(csv_file, backup_file)
-    print(f"Backup created at {backup_file}")
+    # backup_file = csv_file.replace(".csv", "_backup.csv")
+    # shutil.copy(csv_file, backup_file)
+    # print(f"Backup created at {backup_file}")
 
     combined_df = pd.concat([existing_df, merged_df], ignore_index=True)
     combined_df.drop_duplicates(subset="datetime", inplace=True)
@@ -122,3 +122,45 @@ else:
 combined_df.sort_values("datetime", inplace=True)
 combined_df.to_csv(csv_file, index=False)
 print(f"Final CSV written with {len(combined_df)} rows.")
+
+# ------------------------
+# Save API metrics to metrics/metric.json
+# ------------------------
+
+import time
+from pathlib import Path
+import json
+
+# Record success (both .raise_for_status() passed, so 2 successes)
+total_apis = 2
+success_count = 2
+api_success_rate = round(success_count / total_apis, 2)
+
+# Record response time
+avg_response_time = round((pollutant_resp.elapsed.total_seconds() + weather_resp.elapsed.total_seconds()) / 2, 3)
+
+# Prepare metrics directory and path
+Path("metrics").mkdir(parents=True, exist_ok=True)
+metrics_path = "metrics.json"
+
+# Load existing or start new metrics
+if os.path.exists(metrics_path):
+    try:
+        with open(metrics_path, "r") as f:
+            metrics = json.load(f)
+    except Exception:
+        print("⚠️ Failed to load existing metric.json, starting fresh.")
+        metrics = {}
+else:
+    metrics = {}
+
+# Update only API-related metrics
+metrics["api_success_rate"] = api_success_rate
+metrics["api_response_time"] = avg_response_time
+
+# Write back to file
+with open(metrics_path, "w") as f:
+    json.dump(metrics, f, indent=2)
+
+print(f"✅ Saved API metrics to {metrics_path}")
+

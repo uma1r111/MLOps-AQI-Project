@@ -7,6 +7,9 @@ import bentoml
 import mlflow
 from mlflow.tracking import MlflowClient
 from datetime import datetime
+import time
+import json
+
 
 MLFLOW_TRACKING_URI = "http://172.174.154.85:8000"
 EXPERIMENT_NAME = "AQI Model Logging"
@@ -154,6 +157,7 @@ if models_results:
         
     # Retrain best model on full dataset for final predictions
     print(f"\n Retraining best model on full dataset...")
+    start_time = time.time() 
     final_model = SARIMAX(
         endog=target,
         exog=exog_features.values,
@@ -211,3 +215,48 @@ except Exception as e:
     exit(1)
 
 print("\nPrediction workflow completed successfully!")
+
+# ----------------------
+# Save training metrics to metrics/metric.json
+# ----------------------
+
+# Path to metrics file
+metrics_path = "metrics.json"
+
+# Capture training duration
+end_time = time.time()
+if 'start_time' not in globals():
+    start_time = end_time  # fallback if start_time wasn't set earlier
+training_duration = round(end_time - start_time, 2)
+
+# New metrics to save
+new_metrics = {
+    "rmse": round(best_model_info['rmse'], 4),
+    "mae": round(best_model_info['mae'], 4),
+    "aic": round(best_model_info['aic'], 4),
+    "training_duration_seconds": training_duration
+}
+
+# Load or initialize
+if os.path.exists(metrics_path):
+    with open(metrics_path, "r") as f:
+        try:
+            metrics = json.load(f)
+        except json.JSONDecodeError:
+            metrics = {}
+else:
+    metrics = {}
+
+# Update only relevant keys
+metrics.update(new_metrics)
+
+# Write back
+metrics_dir = os.path.dirname(metrics_path)
+if metrics_dir:  # Only create if it's a non-empty directory
+    os.makedirs(metrics_dir, exist_ok=True)
+
+with open(metrics_path, "w") as f:
+    json.dump(metrics, f, indent=4)
+
+print("✅ Training metrics saved to metrics.json")
+
