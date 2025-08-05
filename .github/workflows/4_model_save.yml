@@ -24,7 +24,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy mlflow scikit-learn statsmodels dvc[s3] bentoml==1.2.0
+          pip install pandas numpy scikit-learn statsmodels dvc[s3] bentoml==1.2.0
 
       - name: Pull feature_selection.csv from S3 (via DVC)
         env:

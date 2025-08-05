@@ -8,6 +8,12 @@ import mlflow
 from mlflow.tracking import MlflowClient
 from datetime import datetime
 
+MLFLOW_TRACKING_URI = "http://172.174.154.85:8000"
+EXPERIMENT_NAME = "AQI Model Logging"
+
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_experiment(EXPERIMENT_NAME)
+client = MlflowClient()
 # ----------------------
 # Step 2: Load and Filter Data (matching training code)
 # ----------------------
@@ -121,6 +127,30 @@ if models_results:
     print(f"   RMSE: {best_model_info['rmse']:.4f}")
     print(f"   MAE: {best_model_info['mae']:.4f}")
     print(f"   AIC: {best_model_info['aic']:.4f}")
+
+    # Start MLflow run
+    run_date = datetime.today().strftime("%Y-%m-%d")
+    with mlflow.start_run(run_name=f"SARIMAX Run {run_date}"):
+        # Log parameters
+        mlflow.log_params(best_model_info['params'])
+
+        mlflow.set_tag("stage", "daily_training")
+        mlflow.set_tag("model_type", "SARIMAX")
+
+        # Log metrics
+        mlflow.log_metrics({
+            'rmse': best_model_info['rmse'],
+            'mae': best_model_info['mae'],
+            'aic': best_model_info['aic']
+        })
+
+        # Optional: log the model file as artifact
+        import joblib
+        model_file = "sarimax_model.pkl"
+        joblib.dump(best_model_info['fitted_model'], model_file)
+        mlflow.log_artifact(model_file)
+
+        print("✅ Best model logged to MLflow successfully.")
         
     # Retrain best model on full dataset for final predictions
     print(f"\n Retraining best model on full dataset...")
