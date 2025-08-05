@@ -4,27 +4,11 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 from datetime import timedelta
 import os
 import bentoml
+import mlflow
+from datetime import datetime
 
-
-# ----------------------
-# Step 1: Pull from S3 using DVC
-# ----------------------
-# print("Pulling feature_selection.csv from DVC (S3 remote)...")
-# os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("AWS_ACCESS_KEY_ID", "")
-# os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-# os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
-
-# Prompt for credentials if not set
-# if not os.environ["AWS_ACCESS_KEY_ID"] or not os.environ["AWS_SECRET_ACCESS_KEY"]:
-#     print("AWS credentials not found in environment. Please enter them:")
-#     os.environ["AWS_ACCESS_KEY_ID"] = getpass.getpass("Enter AWS Access Key ID: ")
-#     os.environ["AWS_SECRET_ACCESS_KEY"] = getpass.getpass("Enter AWS Secret Access Key: ")
-
-# if not os.environ["AWS_ACCESS_KEY_ID"] or not os.environ["AWS_SECRET_ACCESS_KEY"]:
-#     print("AWS credentials are required. Exiting.")
-#     exit(1)
-
-# subprocess.run(["dvc", "pull"], check=True)
+# Set experiment (creates if doesn't exist)
+mlflow.set_experiment("AQI Model Logging") 
 
 # ----------------------
 # Step 2: Load and Filter Data (matching training code)
@@ -139,7 +123,29 @@ if models_results:
     print(f"   RMSE: {best_model_info['rmse']:.4f}")
     print(f"   MAE: {best_model_info['mae']:.4f}")
     print(f"   AIC: {best_model_info['aic']:.4f}")
-    
+
+        # Start MLflow run
+    run_date = datetime.today().strftime("%Y-%m-%d")
+    with mlflow.start_run(run_name=f"SARIMAX Run {run_date}"):
+        # Log parameters
+        mlflow.log_params(best_model_info['params'])
+
+        # Log metrics
+        mlflow.log_metrics({
+            'rmse': best_model_info['rmse'],
+            'mae': best_model_info['mae'],
+            'aic': best_model_info['aic']
+        })
+
+        # Optional: log the model file as artifact
+        import joblib
+        model_file = "sarimax_model.pkl"
+        joblib.dump(best_model_info['fitted_model'], model_file)
+        mlflow.log_artifact(model_file)
+
+        print("✅ Best model logged to MLflow successfully.")
+
+        
     # Retrain best model on full dataset for final predictions
     print(f"\n Retraining best model on full dataset...")
     final_model = SARIMAX(
@@ -242,4 +248,3 @@ if os.path.exists(prev_hash_file):
         print("New predictions generated. DVC will track the update.")
 else:
     print("First time tracking predictions.csv with DVC.")
-
