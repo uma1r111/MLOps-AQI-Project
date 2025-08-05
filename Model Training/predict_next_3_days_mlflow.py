@@ -166,26 +166,6 @@ if models_results:
     fitted_model = final_model.fit(disp=0, maxiter=50)
     print(" Final model trained on full dataset!")
 
-    # Save the trained model with the legacy API
-    try:
-        from bentoml.picklable_model import save_model
-        saved_model = save_model(
-            "sarimax_model",
-            fitted_model,
-            metadata={
-                "model_type": "SARIMAX",
-                "best_params": best_model_info['params'],
-                "rmse": best_model_info['rmse'],
-                "mae": best_model_info['mae'],
-                "aic": best_model_info['aic'],
-                "features": list(exog_features.columns),
-                "target": target_col
-            }
-        )
-        print(f" Model saved to BentoML: {saved_model}")
-    except Exception as e:
-        print(f" Failed to save model: {e}")
-
 else:
     print(" No models trained successfully!")
     exit(1)
@@ -216,7 +196,7 @@ try:
     })
     
     # Save results
-    output_df.to_csv("predictions.csv", index=False)
+    output_df.to_csv("predictions_mlflow.csv", index=False)
     print("AQI predictions for next 3 days saved to predictions.csv")
     
     # Display summary
@@ -231,26 +211,3 @@ except Exception as e:
     exit(1)
 
 print("\nPrediction workflow completed successfully!")
-
-# ----------------------
-# Step 7: Check if predictions changed
-# ----------------------
-import hashlib
-
-def file_hash(filepath):
-    with open(filepath, "rb") as f:
-        return hashlib.md5(f.read()).hexdigest()
-
-prev_hash_file = "predictions.csv.dvc"
-new_hash = file_hash("predictions.csv")
-
-# Pull previous hash from DVC if exists
-if os.path.exists(prev_hash_file):
-    with open(prev_hash_file, "r") as f:
-        dvc_contents = f.read()
-    if new_hash in dvc_contents:
-        print("No change detected in predictions.csv (same hash). DVC push will likely skip.")
-    else:
-        print("New predictions generated. DVC will track the update.")
-else:
-    print("First time tracking predictions.csv with DVC.")
