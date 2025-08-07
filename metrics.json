@@ -1,8 +1,8 @@
 {
-    "api_success_rate": 1.0,
-    "api_response_time": 0.513,
-    "rmse": 0.648,
-    "mae": 0.5015,
-    "aic": 4511.5081,
-    "training_duration_seconds": 22.47
+  "api_success_rate": 1.0,
+  "api_response_time": 0.684,
+  "rmse": 0.648,
+  "mae": 0.5015,
+  "aic": 4511.5081,
+  "training_duration_seconds": 22.47
 }
