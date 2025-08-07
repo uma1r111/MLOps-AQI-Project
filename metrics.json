@@ -1,17 +1,4 @@
 {
-<<<<<<< HEAD
-    "api_success_rate": 1.0,
-    "api_response_time": 0.684,
-    "rmse": 0.6391,
-    "mae": 0.4922,
-    "aic": 4505.938,
-    "training_duration_seconds": 9.01
-=======
   "api_success_rate": 1.0,
-  "api_response_time": 0.458,
-  "rmse": 0.648,
-  "mae": 0.5015,
-  "aic": 4511.5081,
-  "training_duration_seconds": 22.47
->>>>>>> 69d7af1c02219aa8eae944c2ebe71355ec411fa3
+  "api_response_time": 0.642
 }
