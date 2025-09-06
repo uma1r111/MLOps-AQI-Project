@@ -1,6 +1,6 @@
 {
   "api_success_rate": 1.0,
-  "api_response_time": 0.513,
+  "api_response_time": 0.641,
   "rmse": 0.6431,
   "mae": 0.4922,
   "aic": 4505.938,
