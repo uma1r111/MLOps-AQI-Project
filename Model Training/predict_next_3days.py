@@ -30,6 +30,26 @@ exog_features = df.drop(columns=["datetime", target_col])
 print(f"Target shape: {target.shape}")
 print(f"Exogenous features shape: {exog_features.shape}")
 
+
+
+# Replace inf/-inf with NaN
+exog_features = exog_features.replace([np.inf, -np.inf], np.nan)
+
+# Combine exog and target temporarily for consistent cleaning
+temp_df = pd.concat([df[["datetime", target_col]], exog_features], axis=1)
+
+# Drop rows where target or any exog feature is NaN
+temp_df.dropna(inplace=True)
+
+# Update clean variables
+target = temp_df[target_col]
+exog_features = temp_df.drop(columns=["datetime", target_col])
+
+print(f"✅ Cleaned data: {len(target)} rows remain after dropping NaN/inf values.")
+print(f"Any NaNs left? {exog_features.isna().sum().sum() > 0}")
+
+
+
 # ----------------------
 # Step 4: Compare two sets of best parameters
 # ----------------------
