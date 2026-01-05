@@ -9,7 +9,7 @@ import bentoml
 # Step 2: Load and Filter Data (matching training code)
 # ----------------------
 df = pd.read_csv("feature_selection.csv")
-df["datetime"] = pd.to_datetime(df["datetime"])
+df["datetime"] = pd.to_datetime(df["datetime"], dayfirst=True, format='mixed')
 
 # Filter last 90 days from the latest date
 latest_date = df["datetime"].max()
