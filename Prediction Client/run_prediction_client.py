@@ -22,7 +22,7 @@ import subprocess
 print("\nLoading and preparing input data...")
 try:
     df = pd.read_csv("feature_selection.csv")
-    df["datetime"] = pd.to_datetime(df["datetime"])
+    df["datetime"] = pd.to_datetime(df["datetime"], dayfirst=True, format='mixed', errors='coerce')
     df = df.sort_values("datetime")
 
     # Select exogenous features only
