@@ -1,8 +1,8 @@
 name: BentoML Model Forecast
 
 on:
-  schedule:
-    - cron: "0 10 * * *"  # Runs daily at 3 PM PKT
+#  schedule:
+#    - cron: "0 10 * * *"  # Runs daily at 3 PM PKT
   workflow_dispatch:       # Allows manual trigger from GitHub UI
   workflow_run:            # Runs after Model Save completes
     workflows: ["Model Save"]
